@@ -11,10 +11,17 @@ from datetime import datetime
 
 st.set_page_config(
     page_title="BRS | Warangal-Khammam-Nalgonda MLC Console",
-    page_icon="🌸",
+    page_icon="🚗",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- BRS CAR SYMBOL SVG ICON ---
+BRS_CAR_SVG = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512" style="width: 48px; height: 48px; fill: #FFFFFF; vertical-align: middle; margin-right: 12px; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.2));">
+  <path d="M171.3 96H468.7L507 192H133L171.3 96zM64 224H576c35.3 0 64 28.7 64 64v96c0 17.7-14.3 32-32 32H576c0 53-43 96-96 96s-96-43-96-96H256c0 53-43 96-96 96s-96-43-96-96H32c-17.7 0-32-14.3-32-32V288c0-35.3 28.7-64 64-64zm96 240a48 48 0 1 0 0-96 48 48 0 1 0 0 96zm320 0a48 48 0 1 0 0-96 48 48 0 1 0 0 96zM114.7 176L160 64c6.7-16.7 22.9-27.7 41-27.7H439c18.1 0 34.3 11 41 27.7l45.3 112H576c61.9 0 112 50.1 112 112v96c0 44.2-35.8 80-80 80H576c-17.7 0-32-14.3-32-32c0-26.5-21.5-48-48-48s-48 21.5-48 48c0 17.7-14.3 32-32 32H224c-17.7 0-32-14.3-32-32c0-26.5-21.5-48-48-48s-48 21.5-48 48c0 17.7-14.3 32-32 32H32c-44.2 0-80-35.8-80-80V288c0-61.9 50.1-112 112-112H114.7z"/>
+</svg>
+"""
 
 # --- BRS PARTY CUSTOM CSS STYLING ---
 st.markdown("""
@@ -25,27 +32,35 @@ st.markdown("""
         color: #2D3748;
     }
 
-    /* Top Banner / Header Card */
+    /* Top Banner / Header Card with Car Symbol */
     .brs-header {
         background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%);
         color: white;
-        padding: 22px 28px;
-        border-radius: 12px;
-        box-shadow: 0px 4px 15px rgba(230, 26, 141, 0.25);
+        padding: 20px 26px;
+        border-radius: 14px;
+        box-shadow: 0px 4px 18px rgba(230, 26, 141, 0.28);
         margin-bottom: 25px;
+        display: flex;
+        align-items: center;
+    }
+    .brs-header-title {
+        display: flex;
+        flex-direction: column;
     }
     .brs-header h1 {
         color: white !important;
-        font-size: 28px !important;
+        font-size: 26px !important;
         font-weight: 800 !important;
         margin: 0;
         padding: 0;
         letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
     }
     .brs-header p {
         color: #FCE4EC !important;
-        font-size: 15px !important;
-        margin-top: 6px;
+        font-size: 14px !important;
+        margin-top: 4px;
         margin-bottom: 0;
         font-weight: 500;
     }
@@ -88,12 +103,6 @@ st.markdown("""
     section[data-testid="stSidebar"] {
         background-color: #FFF5F9 !important;
         border-right: 1.5px solid #F8BBD0 !important;
-    }
-
-    /* Input Field Highlights */
-    .stTextInput > div > div > input:focus, .stSelectbox > div > div:focus {
-        border-color: #E61A8D !important;
-        box-shadow: 0 0 0 1px #E61A8D !important;
     }
 
     /* KPI Metric Cards */
@@ -328,10 +337,13 @@ if "logged_in" not in st.session_state:
 
 # --- AUTH LOGIN SCREEN ---
 if not st.session_state.logged_in:
-    st.markdown("""
+    st.markdown(f"""
     <div class="brs-header">
-        <h1>🌸 BRS MLC GRADUATE VOTER CONSOLE</h1>
-        <p>Warangal – Khammam – Nalgonda Graduate Constituency Portal | War Room System</p>
+        {BRS_CAR_SVG}
+        <div class="brs-header-title">
+            <h1>BRS MLC GRADUATE VOTER CONSOLE</h1>
+            <p>Warangal – Khammam – Nalgonda Graduate Constituency Portal | War Room System</p>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -376,7 +388,12 @@ if not st.session_state.logged_in:
 
 # --- SIDEBAR (BRS BRANDED) ---
 with st.sidebar:
-    st.markdown("### 🌸 BRS War Room")
+    st.markdown(f"""
+    <div style="display: flex; align-items: center; margin-bottom: 15px;">
+        <span style="font-size: 28px; margin-right: 10px;">🚗</span>
+        <h3 style="margin: 0; color: #E61A8D;">BRS War Room</h3>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown(f"**Operator:** {st.session_state.full_name}")
     st.markdown(f"**Role:** `{st.session_state.role}`")
     if st.button("Log Out", use_container_width=True):
@@ -405,10 +422,13 @@ with st.sidebar:
             st.caption("No pending registrations.")
 
 # --- MAIN WORKSPACE ---
-st.markdown("""
+st.markdown(f"""
 <div class="brs-header">
-    <h1>🌸 BRS MLC GRADUATE VOTER CONSOLE</h1>
-    <p>Consolidating Form-18 Applications | Warangal – Khammam – Nalgonda</p>
+    {BRS_CAR_SVG}
+    <div class="brs-header-title">
+        <h1>BRS MLC GRADUATE VOTER CONSOLE</h1>
+        <p>Consolidating Form-18 Applications | Warangal – Khammam – Nalgonda (కారు గుర్తుకే మన ఓటు)</p>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -480,7 +500,7 @@ with main_tab1:
             mobile_no = r2.text_input("Voter Mobile Number", placeholder="10-digit number")
             remarks = st.text_area("Remarks / Notes", placeholder="e.g., Degree Certificate verified, BRS party supporter")
 
-            save_btn = st.form_submit_button("🌸 Save & Submit to BRS Voter Database", use_container_width=True)
+            save_btn = st.form_submit_button("🚗 Save & Submit to BRS Voter Database", use_container_width=True)
 
             if save_btn:
                 if not app_id or not name:
