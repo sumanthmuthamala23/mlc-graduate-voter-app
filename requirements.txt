@@ -1,0 +1,5 @@
+streamlit
+pypdf
+gspread
+google-auth
+pandas
