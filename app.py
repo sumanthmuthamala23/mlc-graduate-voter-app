@@ -7,6 +7,7 @@ import sqlite3
 import hashlib
 import re
 import os
+import base64
 from datetime import datetime
 
 st.set_page_config(
@@ -16,16 +17,49 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# --- BACKGROUND LOGO ENCODER ---
+def get_base64_image(image_path):
+    if os.path.exists(image_path):
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    return ""
+
+logo_base64 = get_base64_image("brs_logo.jpg")
+
+bg_watermark_css = ""
+if logo_base64:
+    bg_watermark_css = f"""
+    .stApp::before {{
+        content: "";
+        position: fixed;
+        top: 50%;
+        left: 55%;
+        transform: translate(-50%, -50%);
+        width: 580px;
+        height: 580px;
+        background-image: url("data:image/jpeg;base64,{logo_base64}");
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: contain;
+        opacity: 0.10;
+        pointer-events: none;
+        z-index: 0;
+    }}
+    """
+
 # --- BRS THEME CUSTOM CSS ---
-st.markdown("""
+st.markdown(f"""
 <style>
-.stApp {
+.stApp {{
     background: linear-gradient(135deg, #FFF0F6 0%, #FFFFFF 60%, #FFE6F0 100%);
     color: #2D3748;
-}
+    position: relative;
+}}
+
+{bg_watermark_css}
 
 /* Banner Styling */
-.brs-banner {
+.brs-banner {{
     background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%);
     color: white;
     padding: 20px 24px;
@@ -35,31 +69,33 @@ st.markdown("""
     display: flex;
     align-items: center;
     gap: 16px;
-}
-.brs-car-icon {
-    font-size: 42px;
+    position: relative;
+    z-index: 1;
+}}
+.brs-car-icon {{
+    font-size: 40px;
     background: rgba(255, 255, 255, 0.2);
     border-radius: 10px;
     padding: 6px 12px;
     display: inline-block;
-}
-.brs-banner-text h1 {
+}}
+.brs-banner-text h1 {{
     color: #FFFFFF !important;
     font-size: 26px !important;
     font-weight: 800 !important;
     margin: 0 !important;
     padding: 0 !important;
     letter-spacing: 0.5px;
-}
-.brs-banner-text p {
+}}
+.brs-banner-text p {{
     color: #FCE4EC !important;
     font-size: 14px !important;
     margin: 4px 0 0 0 !important;
     font-weight: 500;
-}
+}}
 
 /* BRS Vibrant Pink Buttons */
-div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {
+div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {{
     background: linear-gradient(90deg, #E61A8D 0%, #D81B60 100%) !important;
     color: white !important;
     font-size: 16px !important;
@@ -68,46 +104,48 @@ div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {
     border: none !important;
     padding: 10px 24px !important;
     box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3) !important;
-}
-div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {
+}}
+div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {{
     background: linear-gradient(90deg, #C2185B 0%, #AD1457 100%) !important;
     box-shadow: 0 6px 16px rgba(216, 27, 96, 0.45) !important;
-}
+}}
 
 /* Form Container */
-[data-testid="stForm"] {
-    background-color: #FFFFFF !important;
+[data-testid="stForm"] {{
+    background-color: rgba(255, 255, 255, 0.92) !important;
     border: 1.5px solid #F8BBD0 !important;
     border-radius: 14px !important;
     padding: 22px !important;
     box-shadow: 0 4px 14px rgba(230, 26, 141, 0.08) !important;
-}
+    position: relative;
+    z-index: 1;
+}}
 
 /* Sidebar */
-section[data-testid="stSidebar"] {
+section[data-testid="stSidebar"] {{
     background-color: #FFF5F9 !important;
     border-right: 1.5px solid #F8BBD0 !important;
-}
+}}
 
 /* KPI Cards */
-div[data-testid="stMetric"] {
-    background: #FFFFFF;
+div[data-testid="stMetric"] {{
+    background: rgba(255, 255, 255, 0.95);
     border-left: 5px solid #E61A8D;
     border-radius: 10px;
     padding: 14px 18px;
     box-shadow: 0 2px 10px rgba(230, 26, 141, 0.08);
-}
-div[data-testid="stMetricValue"] {
+}}
+div[data-testid="stMetricValue"] {{
     color: #C2185B !important;
     font-weight: 800 !important;
-}
+}}
 
 /* Active Tabs */
-button[data-baseweb="tab"][aria-selected="true"] {
+button[data-baseweb="tab"][aria-selected="true"] {{
     color: #E61A8D !important;
     border-bottom-color: #E61A8D !important;
     font-weight: 700 !important;
-}
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -461,7 +499,8 @@ with main_tab1:
             st.markdown("---")
             st.markdown("##### 🤝 Party Volunteer & Reference Details")
             r1, r2 = st.columns(2)
-            ref_name = r1.text_input("Party Reference / Cadre Name", value="Sumanth Muthamala", placeholder="e.g., Mandal Incharge / Booth President")
+            # Empty value by default, clean placeholder provided
+            ref_name = r1.text_input("Party Reference / Cadre Name", value="", placeholder="Enter Reference / Mandal Incharge Name")
             mobile_no = r2.text_input("Voter Mobile Number", placeholder="10-digit number")
             remarks = st.text_area("Remarks / Notes", placeholder="e.g., Degree Certificate verified, BRS party supporter")
 
