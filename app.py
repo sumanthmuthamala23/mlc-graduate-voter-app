@@ -16,114 +16,98 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- BRS CAR SYMBOL SVG ICON ---
-BRS_CAR_SVG = """
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512" style="width: 48px; height: 48px; fill: #FFFFFF; vertical-align: middle; margin-right: 12px; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.2));">
-  <path d="M171.3 96H468.7L507 192H133L171.3 96zM64 224H576c35.3 0 64 28.7 64 64v96c0 17.7-14.3 32-32 32H576c0 53-43 96-96 96s-96-43-96-96H256c0 53-43 96-96 96s-96-43-96-96H32c-17.7 0-32-14.3-32-32V288c0-35.3 28.7-64 64-64zm96 240a48 48 0 1 0 0-96 48 48 0 1 0 0 96zm320 0a48 48 0 1 0 0-96 48 48 0 1 0 0 96zM114.7 176L160 64c6.7-16.7 22.9-27.7 41-27.7H439c18.1 0 34.3 11 41 27.7l45.3 112H576c61.9 0 112 50.1 112 112v96c0 44.2-35.8 80-80 80H576c-17.7 0-32-14.3-32-32c0-26.5-21.5-48-48-48s-48 21.5-48 48c0 17.7-14.3 32-32 32H224c-17.7 0-32-14.3-32-32c0-26.5-21.5-48-48-48s-48 21.5-48 48c0 17.7-14.3 32-32 32H32c-44.2 0-80-35.8-80-80V288c0-61.9 50.1-112 112-112H114.7z"/>
-</svg>
-"""
-
-# --- BRS PARTY CUSTOM CSS STYLING ---
+# --- BRS THEME CUSTOM CSS ---
 st.markdown("""
 <style>
-    /* Main Background Tone */
-    .stApp {
-        background: linear-gradient(135deg, #FFF0F6 0%, #FFFFFF 60%, #FFE6F0 100%);
-        color: #2D3748;
-    }
+.stApp {
+    background: linear-gradient(135deg, #FFF0F6 0%, #FFFFFF 60%, #FFE6F0 100%);
+    color: #2D3748;
+}
 
-    /* Top Banner / Header Card with Car Symbol */
-    .brs-header {
-        background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%);
-        color: white;
-        padding: 20px 26px;
-        border-radius: 14px;
-        box-shadow: 0px 4px 18px rgba(230, 26, 141, 0.28);
-        margin-bottom: 25px;
-        display: flex;
-        align-items: center;
-    }
-    .brs-header-title {
-        display: flex;
-        flex-direction: column;
-    }
-    .brs-header h1 {
-        color: white !important;
-        font-size: 26px !important;
-        font-weight: 800 !important;
-        margin: 0;
-        padding: 0;
-        letter-spacing: 0.5px;
-        display: flex;
-        align-items: center;
-    }
-    .brs-header p {
-        color: #FCE4EC !important;
-        font-size: 14px !important;
-        margin-top: 4px;
-        margin-bottom: 0;
-        font-weight: 500;
-    }
+/* Banner Styling */
+.brs-banner {
+    background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%);
+    color: white;
+    padding: 20px 24px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(230, 26, 141, 0.28);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.brs-car-icon {
+    font-size: 42px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    padding: 6px 12px;
+    display: inline-block;
+}
+.brs-banner-text h1 {
+    color: #FFFFFF !important;
+    font-size: 26px !important;
+    font-weight: 800 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    letter-spacing: 0.5px;
+}
+.brs-banner-text p {
+    color: #FCE4EC !important;
+    font-size: 14px !important;
+    margin: 4px 0 0 0 !important;
+    font-weight: 500;
+}
 
-    /* Primary Buttons (BRS Vibrant Pink) */
-    div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {
-        background: linear-gradient(90deg, #E61A8D 0%, #D81B60 100%) !important;
-        color: white !important;
-        font-size: 16px !important;
-        font-weight: 700 !important;
-        border-radius: 10px !important;
-        border: none !important;
-        padding: 10px 24px !important;
-        box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3) !important;
-        transition: all 0.2s ease-in-out !important;
-    }
-    div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {
-        background: linear-gradient(90deg, #C2185B 0%, #AD1457 100%) !important;
-        box-shadow: 0 6px 16px rgba(216, 27, 96, 0.45) !important;
-        transform: translateY(-1px);
-    }
+/* BRS Vibrant Pink Buttons */
+div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {
+    background: linear-gradient(90deg, #E61A8D 0%, #D81B60 100%) !important;
+    color: white !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    border-radius: 10px !important;
+    border: none !important;
+    padding: 10px 24px !important;
+    box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3) !important;
+}
+div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {
+    background: linear-gradient(90deg, #C2185B 0%, #AD1457 100%) !important;
+    box-shadow: 0 6px 16px rgba(216, 27, 96, 0.45) !important;
+}
 
-    /* Form Section Borders & Background */
-    [data-testid="stForm"] {
-        background-color: #FFFFFF !important;
-        border: 1.5px solid #F8BBD0 !important;
-        border-radius: 14px !important;
-        padding: 22px !important;
-        box-shadow: 0 4px 14px rgba(230, 26, 141, 0.08) !important;
-    }
+/* Form Container */
+[data-testid="stForm"] {
+    background-color: #FFFFFF !important;
+    border: 1.5px solid #F8BBD0 !important;
+    border-radius: 14px !important;
+    padding: 22px !important;
+    box-shadow: 0 4px 14px rgba(230, 26, 141, 0.08) !important;
+}
 
-    /* File Uploader Container */
-    [data-testid="stFileUploadDropzone"] {
-        background-color: #FFF5F8 !important;
-        border: 2px dashed #E61A8D !important;
-        border-radius: 12px !important;
-    }
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background-color: #FFF5F9 !important;
+    border-right: 1.5px solid #F8BBD0 !important;
+}
 
-    /* Sidebar Styling */
-    section[data-testid="stSidebar"] {
-        background-color: #FFF5F9 !important;
-        border-right: 1.5px solid #F8BBD0 !important;
-    }
+/* KPI Cards */
+div[data-testid="stMetric"] {
+    background: #FFFFFF;
+    border-left: 5px solid #E61A8D;
+    border-radius: 10px;
+    padding: 14px 18px;
+    box-shadow: 0 2px 10px rgba(230, 26, 141, 0.08);
+}
+div[data-testid="stMetricValue"] {
+    color: #C2185B !important;
+    font-weight: 800 !important;
+}
 
-    /* KPI Metric Cards */
-    div[data-testid="stMetric"] {
-        background: #FFFFFF;
-        border-left: 5px solid #E61A8D;
-        border-radius: 10px;
-        padding: 14px 18px;
-        box-shadow: 0 2px 10px rgba(230, 26, 141, 0.08);
-    }
-    div[data-testid="stMetricValue"] {
-        color: #C2185B !important;
-        font-weight: 800 !important;
-    }
-
-    /* Tab Headers Active Color */
-    button[data-baseweb="tab"][aria-selected="true"] {
-        color: #E61A8D !important;
-        border-bottom-color: #E61A8D !important;
-        font-weight: 700 !important;
-    }
+/* Active Tabs */
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: #E61A8D !important;
+    border-bottom-color: #E61A8D !important;
+    font-weight: 700 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -137,7 +121,10 @@ HEADERS = [
     "Reference Name", "Mobile Number", "Remarks", "Operator Username"
 ]
 
-# --- LOCAL DATABASE & AUDIT LOG ---
+def render_brs_header(title="BRS MLC GRADUATE VOTER CONSOLE", subtitle="Warangal – Khammam – Nalgonda Graduate Constituency Portal | War Room System"):
+    st.markdown(f"""<div class="brs-banner"><div class="brs-car-icon">🚗</div><div class="brs-banner-text"><h1>{title}</h1><p>{subtitle}</p></div></div>""", unsafe_allow_html=True)
+
+# --- DATABASE SETUP ---
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -164,7 +151,7 @@ def init_db():
 
 init_db()
 
-# --- 11 REVENUE DISTRICTS JURISDICTION ---
+# --- JURISDICTION DATA ---
 JURISDICTION_DATA = {
     "Khammam": {
         "Khammam Urban": ["Khammam (M Corp)", "Khanapuram Haveli", "Dhamsalapuram", "Mallemadugu"],
@@ -241,7 +228,7 @@ JURISDICTION_DATA = {
     }
 }
 
-# --- DUAL CREDENTIAL CONNECTOR (LOCAL + STREAMLIT CLOUD) ---
+# --- GOOGLE SHEETS CONNECTOR ---
 def get_worksheet():
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
@@ -297,7 +284,6 @@ def parse_acknowledgement_pdf(file_obj):
 
     return parsed
 
-# --- USER MANAGEMENT ---
 def verify_user(username, password):
     pwd_hash = hashlib.sha256(password.encode()).hexdigest()
     conn = sqlite3.connect(DB_FILE)
@@ -337,15 +323,7 @@ if "logged_in" not in st.session_state:
 
 # --- AUTH LOGIN SCREEN ---
 if not st.session_state.logged_in:
-    st.markdown(f"""
-    <div class="brs-header">
-        {BRS_CAR_SVG}
-        <div class="brs-header-title">
-            <h1>BRS MLC GRADUATE VOTER CONSOLE</h1>
-            <p>Warangal – Khammam – Nalgonda Graduate Constituency Portal | War Room System</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    render_brs_header("BRS MLC GRADUATE VOTER CONSOLE", "Warangal – Khammam – Nalgonda Graduate Constituency Portal | War Room System")
 
     tab1, tab2 = st.tabs(["🔑 War Room Sign In", "📝 Volunteer / Staff Registration"])
 
@@ -386,14 +364,9 @@ if not st.session_state.logged_in:
                         st.error(msg)
     st.stop()
 
-# --- SIDEBAR (BRS BRANDED) ---
+# --- SIDEBAR ---
 with st.sidebar:
-    st.markdown(f"""
-    <div style="display: flex; align-items: center; margin-bottom: 15px;">
-        <span style="font-size: 28px; margin-right: 10px;">🚗</span>
-        <h3 style="margin: 0; color: #E61A8D;">BRS War Room</h3>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("""<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;"><span style="font-size: 26px;">🚗</span><h3 style="margin: 0; color: #E61A8D;">BRS War Room</h3></div>""", unsafe_allow_html=True)
     st.markdown(f"**Operator:** {st.session_state.full_name}")
     st.markdown(f"**Role:** `{st.session_state.role}`")
     if st.button("Log Out", use_container_width=True):
@@ -422,15 +395,7 @@ with st.sidebar:
             st.caption("No pending registrations.")
 
 # --- MAIN WORKSPACE ---
-st.markdown(f"""
-<div class="brs-header">
-    {BRS_CAR_SVG}
-    <div class="brs-header-title">
-        <h1>BRS MLC GRADUATE VOTER CONSOLE</h1>
-        <p>Consolidating Form-18 Applications | Warangal – Khammam – Nalgonda (కారు గుర్తుకే మన ఓటు)</p>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+render_brs_header("BRS MLC GRADUATE VOTER CONSOLE", "Consolidating Form-18 Applications | Warangal – Khammam – Nalgonda (కారు గుర్తుకే మన ఓటు)")
 
 if st.session_state.role == "Admin":
     main_tab1, main_tab2 = st.tabs(["📥 Data Ingestion & Form-18 Processing", "📊 War Room Analytics & Mandal Breakdown"])
@@ -554,7 +519,6 @@ if st.session_state.role == "Admin":
                     dup_df = pd.read_sql_query("SELECT * FROM duplicate_audit ORDER BY id DESC", conn)
                     conn.close()
 
-                    # Top KPI Metrics with BRS Pink Cards
                     m1, m2, m3, m4 = st.columns(4)
                     total_votes = len(df)
                     unique_voters = df["Application ID"].nunique() if "Application ID" in df.columns else total_votes
@@ -568,7 +532,6 @@ if st.session_state.role == "Admin":
 
                     st.divider()
 
-                    # Mandal-Wise Breakdown
                     st.subheader("📍 Mandal-Wise Mobilization Breakdown")
                     d_col1, d_col2 = st.columns([1, 2])
 
@@ -594,7 +557,6 @@ if st.session_state.role == "Admin":
 
                     st.divider()
 
-                    # Live Duplicate Counter & Audit Trail
                     st.subheader("🚨 Live Duplicate Submissions Log")
                     if not dup_df.empty:
                         st.dataframe(
