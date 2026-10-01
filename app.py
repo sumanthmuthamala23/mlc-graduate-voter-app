@@ -30,15 +30,25 @@ def get_base64_logo():
 
 logo_data_uri = get_base64_logo()
 
+# Subtly dimmed watermark overlay behind clean glassmorphism card
 bg_watermark_css = ""
 if logo_data_uri:
     bg_watermark_css = f"""
-    .stApp {{
-        background-image: url("{logo_data_uri}") !important;
-        background-repeat: no-repeat !important;
-        background-position: center 55% !important;
-        background-size: 550px !important;
-        background-attachment: fixed !important;
+    .stApp::before {{
+        content: "";
+        position: fixed;
+        top: 55%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 520px;
+        height: 520px;
+        background-image: url("{logo_data_uri}");
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: contain;
+        opacity: 0.08 !important;
+        pointer-events: none;
+        z-index: 0;
     }}
     """
 
@@ -46,36 +56,39 @@ if logo_data_uri:
 st.markdown(f"""
 <style>
 .stApp {{
-    background-color: #FFF2F7 !important;
-    color: #2D3748;
+    background: linear-gradient(135deg, #FFF0F5 0%, #FFFFFF 50%, #FFEBF2 100%) !important;
+    color: #1A202C;
+    position: relative;
 }}
 
 {bg_watermark_css}
 
-/* Main Content Wrapper - keeps inputs crisp and fully interactable */
 .main .block-container {{
     position: relative;
-    z-index: 2;
+    z-index: 1;
+    max-width: 1100px;
+    padding-top: 2rem;
 }}
 
-/* Top Banner */
+/* Top Banner Header */
 .brs-banner {{
     background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%);
     color: white;
-    padding: 18px 24px;
-    border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(230, 26, 141, 0.28);
-    margin-bottom: 22px;
+    padding: 22px 28px;
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(230, 26, 141, 0.25);
+    margin-bottom: 24px;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 18px;
 }}
 .brs-car-icon {{
-    font-size: 38px;
-    background: rgba(255, 255, 255, 0.22);
-    border-radius: 10px;
-    padding: 6px 12px;
+    font-size: 42px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 6px 14px;
     display: inline-block;
+    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.2);
 }}
 .brs-banner-text h1 {{
     color: #FFFFFF !important;
@@ -83,6 +96,7 @@ st.markdown(f"""
     font-weight: 800 !important;
     margin: 0 !important;
     padding: 0 !important;
+    letter-spacing: 0.5px;
 }}
 .brs-banner-text p {{
     color: #FCE4EC !important;
@@ -91,39 +105,67 @@ st.markdown(f"""
     font-weight: 500;
 }}
 
-/* Primary Buttons */
+/* Crisp, Solid High-Contrast Form Box */
+[data-testid="stForm"] {{
+    background: #FFFFFF !important;
+    border: 1.5px solid #F3C4D8 !important;
+    border-radius: 16px !important;
+    padding: 28px !important;
+    box-shadow: 0 12px 32px rgba(230, 26, 141, 0.12) !important;
+}}
+
+/* Text Input Fields */
+.stTextInput input {{
+    background-color: #FAFAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+    color: #1A202C !important;
+    font-weight: 500 !important;
+}}
+.stTextInput input:focus {{
+    border-color: #E61A8D !important;
+    box-shadow: 0 0 0 2px rgba(230, 26, 141, 0.2) !important;
+}}
+
+/* BRS Pink Action Buttons */
 div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {{
     background: linear-gradient(90deg, #E61A8D 0%, #D81B60 100%) !important;
     color: white !important;
-    font-size: 16px !important;
+    font-size: 15px !important;
     font-weight: 700 !important;
     border-radius: 10px !important;
     border: none !important;
     padding: 10px 24px !important;
-    box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3) !important;
+    box-shadow: 0 4px 14px rgba(216, 27, 96, 0.35) !important;
+    transition: all 0.2s ease-in-out !important;
 }}
 div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {{
     background: linear-gradient(90deg, #C2185B 0%, #AD1457 100%) !important;
+    box-shadow: 0 6px 18px rgba(216, 27, 96, 0.45) !important;
+    transform: translateY(-1px);
 }}
 
-/* Form Container Card */
-[data-testid="stForm"] {{
-    background-color: rgba(255, 255, 255, 0.94) !important;
-    border: 1.5px solid #F8BBD0 !important;
-    border-radius: 14px !important;
-    padding: 24px !important;
-    box-shadow: 0 6px 20px rgba(230, 26, 141, 0.12) !important;
+/* Tabs Styling */
+button[data-baseweb="tab"] {{
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    color: #718096 !important;
+}}
+button[data-baseweb="tab"][aria-selected="true"] {{
+    color: #E61A8D !important;
+    border-bottom: 3px solid #E61A8D !important;
+    font-weight: 800 !important;
 }}
 
 /* Sidebar */
 section[data-testid="stSidebar"] {{
-    background-color: #FFF5F9 !important;
+    background-color: #FFF7FA !important;
     border-right: 1.5px solid #F8BBD0 !important;
 }}
 
-/* KPI Cards */
+/* Metric Cards */
 div[data-testid="stMetric"] {{
-    background: rgba(255, 255, 255, 0.95);
+    background: #FFFFFF;
     border-left: 5px solid #E61A8D;
     border-radius: 10px;
     padding: 14px 18px;
@@ -132,13 +174,6 @@ div[data-testid="stMetric"] {{
 div[data-testid="stMetricValue"] {{
     color: #C2185B !important;
     font-weight: 800 !important;
-}}
-
-/* Tabs Active */
-button[data-baseweb="tab"][aria-selected="true"] {{
-    color: #E61A8D !important;
-    border-bottom-color: #E61A8D !important;
-    font-weight: 700 !important;
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -183,7 +218,7 @@ def init_db():
 
 init_db()
 
-# --- JURISDICTION DATA ---
+# --- 11 REVENUE DISTRICTS JURISDICTION ---
 JURISDICTION_DATA = {
     "Khammam": {
         "Khammam Urban": ["Khammam (M Corp)", "Khanapuram Haveli", "Dhamsalapuram", "Mallemadugu"],
@@ -260,7 +295,7 @@ JURISDICTION_DATA = {
     }
 }
 
-# --- GOOGLE SHEETS CONNECTOR ---
+# --- DUAL CREDENTIAL CONNECTOR (LOCAL + STREAMLIT CLOUD) ---
 def get_worksheet():
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
@@ -357,7 +392,7 @@ if "logged_in" not in st.session_state:
 if not st.session_state.logged_in:
     render_brs_header("BRS MLC GRADUATE VOTER CONSOLE", "Warangal – Khammam – Nalgonda Graduate Constituency Portal | War Room System")
 
-    col_l, col_center, col_r = st.columns([1, 1.8, 1])
+    col_l, col_center, col_r = st.columns([1, 1.6, 1])
     with col_center:
         tab1, tab2 = st.tabs(["🔑 War Room Sign In", "📝 Volunteer Registration"])
 
