@@ -7,10 +7,116 @@ import sqlite3
 import hashlib
 import re
 import os
-import json
 from datetime import datetime
 
-st.set_page_config(page_title="MLC Graduate Voter Console", layout="wide", page_icon="🗳️")
+st.set_page_config(
+    page_title="BRS | Warangal-Khammam-Nalgonda MLC Console",
+    page_icon="🌸",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# --- BRS PARTY CUSTOM CSS STYLING ---
+st.markdown("""
+<style>
+    /* Main Background Tone */
+    .stApp {
+        background: linear-gradient(135deg, #FFF0F6 0%, #FFFFFF 60%, #FFE6F0 100%);
+        color: #2D3748;
+    }
+
+    /* Top Banner / Header Card */
+    .brs-header {
+        background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%);
+        color: white;
+        padding: 22px 28px;
+        border-radius: 12px;
+        box-shadow: 0px 4px 15px rgba(230, 26, 141, 0.25);
+        margin-bottom: 25px;
+    }
+    .brs-header h1 {
+        color: white !important;
+        font-size: 28px !important;
+        font-weight: 800 !important;
+        margin: 0;
+        padding: 0;
+        letter-spacing: 0.5px;
+    }
+    .brs-header p {
+        color: #FCE4EC !important;
+        font-size: 15px !important;
+        margin-top: 6px;
+        margin-bottom: 0;
+        font-weight: 500;
+    }
+
+    /* Primary Buttons (BRS Vibrant Pink) */
+    div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {
+        background: linear-gradient(90deg, #E61A8D 0%, #D81B60 100%) !important;
+        color: white !important;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        border-radius: 10px !important;
+        border: none !important;
+        padding: 10px 24px !important;
+        box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3) !important;
+        transition: all 0.2s ease-in-out !important;
+    }
+    div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {
+        background: linear-gradient(90deg, #C2185B 0%, #AD1457 100%) !important;
+        box-shadow: 0 6px 16px rgba(216, 27, 96, 0.45) !important;
+        transform: translateY(-1px);
+    }
+
+    /* Form Section Borders & Background */
+    [data-testid="stForm"] {
+        background-color: #FFFFFF !important;
+        border: 1.5px solid #F8BBD0 !important;
+        border-radius: 14px !important;
+        padding: 22px !important;
+        box-shadow: 0 4px 14px rgba(230, 26, 141, 0.08) !important;
+    }
+
+    /* File Uploader Container */
+    [data-testid="stFileUploadDropzone"] {
+        background-color: #FFF5F8 !important;
+        border: 2px dashed #E61A8D !important;
+        border-radius: 12px !important;
+    }
+
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        background-color: #FFF5F9 !important;
+        border-right: 1.5px solid #F8BBD0 !important;
+    }
+
+    /* Input Field Highlights */
+    .stTextInput > div > div > input:focus, .stSelectbox > div > div:focus {
+        border-color: #E61A8D !important;
+        box-shadow: 0 0 0 1px #E61A8D !important;
+    }
+
+    /* KPI Metric Cards */
+    div[data-testid="stMetric"] {
+        background: #FFFFFF;
+        border-left: 5px solid #E61A8D;
+        border-radius: 10px;
+        padding: 14px 18px;
+        box-shadow: 0 2px 10px rgba(230, 26, 141, 0.08);
+    }
+    div[data-testid="stMetricValue"] {
+        color: #C2185B !important;
+        font-weight: 800 !important;
+    }
+
+    /* Tab Headers Active Color */
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #E61A8D !important;
+        border-bottom-color: #E61A8D !important;
+        font-weight: 700 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 DB_FILE = "mlc_users.db"
 SHEET_ID = "1DiP4t2s3aUt_fOLEMjhGCy_nacXUhIfEl-y7kdV3WBU"
@@ -43,13 +149,13 @@ def init_db():
     c.execute("SELECT * FROM users WHERE username = 'admin'")
     if not c.fetchone():
         pwd_hash = hashlib.sha256("Admin@123".encode()).hexdigest()
-        c.execute("INSERT INTO users VALUES ('admin', ?, 'System Administrator', 'Admin', 'Approved')", (pwd_hash,))
+        c.execute("INSERT INTO users VALUES ('admin', ?, 'BRS Central War Room', 'Admin', 'Approved')", (pwd_hash,))
     conn.commit()
     conn.close()
 
 init_db()
 
-# --- JURISDICTION HIERARCHY ---
+# --- 11 REVENUE DISTRICTS JURISDICTION ---
 JURISDICTION_DATA = {
     "Khammam": {
         "Khammam Urban": ["Khammam (M Corp)", "Khanapuram Haveli", "Dhamsalapuram", "Mallemadugu"],
@@ -126,7 +232,7 @@ JURISDICTION_DATA = {
     }
 }
 
-# --- DUAL-MODE GOOGLE SHEETS CONNECTOR (LOCAL + STREAMLIT CLOUD) ---
+# --- DUAL CREDENTIAL CONNECTOR (LOCAL + STREAMLIT CLOUD) ---
 def get_worksheet():
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
@@ -139,14 +245,12 @@ def get_worksheet():
     elif os.path.exists("service_account.json"):
         creds = Credentials.from_service_account_file("service_account.json", scopes=scopes)
     else:
-        return None, "No service account credentials found. Configure service_account.json or Streamlit Secrets."
+        return None, "Missing credentials file or Streamlit Cloud Secrets."
 
     try:
         gc = gspread.authorize(creds)
         spreadsheet = gc.open_by_key(SHEET_ID)
         sheet = spreadsheet.sheet1
-        
-        # Ensure header row exists
         existing_rows = sheet.get_all_values()
         if not existing_rows or existing_rows[0] != HEADERS:
             if not existing_rows:
@@ -184,7 +288,7 @@ def parse_acknowledgement_pdf(file_obj):
 
     return parsed
 
-# --- USER AUTHENTICATION HELPERS ---
+# --- USER MANAGEMENT ---
 def verify_user(username, password):
     pwd_hash = hashlib.sha256(password.encode()).hexdigest()
     conn = sqlite3.connect(DB_FILE)
@@ -202,7 +306,7 @@ def register_user(username, password, full_name):
         c.execute("INSERT INTO users VALUES (?, ?, ?, 'Staff', 'Pending')", (username, pwd_hash, full_name))
         conn.commit()
         conn.close()
-        return True, "Registration successful! Awaiting Admin approval."
+        return True, "Registration successful! Awaiting War Room approval."
     except sqlite3.IntegrityError:
         conn.close()
         return False, "Username already exists."
@@ -222,23 +326,28 @@ if "logged_in" not in st.session_state:
     st.session_state.role = None
     st.session_state.full_name = None
 
+# --- AUTH LOGIN SCREEN ---
 if not st.session_state.logged_in:
-    st.title("🗳️ MLC Graduate Applications Desk")
-    st.caption("Warangal–Khammam–Nalgonda Graduate Constituency Portal")
-    
-    tab1, tab2 = st.tabs(["🔑 Sign In", "📝 Staff Registration"])
-    
+    st.markdown("""
+    <div class="brs-header">
+        <h1>🌸 BRS MLC GRADUATE VOTER CONSOLE</h1>
+        <p>Warangal – Khammam – Nalgonda Graduate Constituency Portal | War Room System</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    tab1, tab2 = st.tabs(["🔑 War Room Sign In", "📝 Volunteer / Staff Registration"])
+
     with tab1:
         with st.form("login_form"):
             uname = st.text_input("Username")
             pword = st.text_input("Password", type="password")
-            submit = st.form_submit_button("Log In", use_container_width=True)
+            submit = st.form_submit_button("Sign In to Console", use_container_width=True)
             if submit:
                 user_info = verify_user(uname, pword)
                 if user_info:
                     fname, role, status = user_info
                     if status != "Approved":
-                        st.error("⏳ Account is pending approval by the Admin.")
+                        st.error("⏳ Account pending War Room Admin approval.")
                     else:
                         st.session_state.logged_in = True
                         st.session_state.username = uname
@@ -246,7 +355,7 @@ if not st.session_state.logged_in:
                         st.session_state.full_name = fname
                         st.rerun()
                 else:
-                    st.error("Invalid Username or Password.")
+                    st.error("Invalid credentials.")
 
     with tab2:
         with st.form("register_form"):
@@ -265,8 +374,9 @@ if not st.session_state.logged_in:
                         st.error(msg)
     st.stop()
 
-# --- SIDEBAR & USER CONTROLS ---
+# --- SIDEBAR (BRS BRANDED) ---
 with st.sidebar:
+    st.markdown("### 🌸 BRS War Room")
     st.markdown(f"**Operator:** {st.session_state.full_name}")
     st.markdown(f"**Role:** `{st.session_state.role}`")
     if st.button("Log Out", use_container_width=True):
@@ -275,11 +385,11 @@ with st.sidebar:
     st.divider()
 
     if st.session_state.role == "Admin":
-        st.subheader("👥 User Approvals")
+        st.subheader("👥 Volunteer Approvals")
         conn = sqlite3.connect(DB_FILE)
         users_df = pd.read_sql_query("SELECT username, full_name, role, status FROM users", conn)
         conn.close()
-        
+
         pending_users = users_df[users_df["status"] == "Pending"]
         if not pending_users.empty:
             for _, row in pending_users.iterrows():
@@ -294,9 +404,16 @@ with st.sidebar:
         else:
             st.caption("No pending registrations.")
 
-# --- NAVIGATION TABS ---
+# --- MAIN WORKSPACE ---
+st.markdown("""
+<div class="brs-header">
+    <h1>🌸 BRS MLC GRADUATE VOTER CONSOLE</h1>
+    <p>Consolidating Form-18 Applications | Warangal – Khammam – Nalgonda</p>
+</div>
+""", unsafe_allow_html=True)
+
 if st.session_state.role == "Admin":
-    main_tab1, main_tab2 = st.tabs(["📥 Data Entry & PDF Consolidation", "📊 Admin Analytics & Mandal Breakdown"])
+    main_tab1, main_tab2 = st.tabs(["📥 Data Ingestion & Form-18 Processing", "📊 War Room Analytics & Mandal Breakdown"])
 else:
     main_tab1 = st.container()
 
@@ -304,11 +421,10 @@ else:
 # TAB 1: FORM-18 ENTRY
 # ==============================================================================
 with main_tab1:
-    st.title("Consolidate Form-18 Graduate Votes")
-    upload_col, data_col = st.columns([1, 1.2], gap="large")
+    upload_col, data_col = st.columns([1, 1.25], gap="large")
 
     with upload_col:
-        st.subheader("1. Attach Form-18 Slip")
+        st.markdown("#### 1. Attach Form-18 PDF")
         uploaded_pdf = st.file_uploader("Upload CEO Telangana Form-18 PDF", type=["pdf"])
 
         extracted = {
@@ -319,13 +435,13 @@ with main_tab1:
 
         if uploaded_pdf is not None:
             extracted = parse_acknowledgement_pdf(uploaded_pdf)
-            st.success("✅ Acknowledgment Form parsed successfully!")
+            st.success("✅ Form-18 Slip Extracted Successfully!")
 
     with data_col:
-        st.subheader("2. Review & Tag Jurisdiction Details")
+        st.markdown("#### 2. Review & Tag Jurisdiction Details")
 
         with st.form("voter_entry_form"):
-            st.markdown("##### Extracted Voter Details")
+            st.markdown("##### 👤 Applicant Information")
             c1, c2 = st.columns(2)
             app_id = c1.text_input("Application ID", value=extracted["application_id"])
             name = c2.text_input("Applicant Name", value=extracted["applicant_name"])
@@ -340,7 +456,7 @@ with main_tab1:
             status = c7.text_input("Status", value=extracted["current_status"])
 
             st.markdown("---")
-            st.markdown("##### Ordinary Residence Jurisdiction (MLC Limits)")
+            st.markdown("##### 📍 Tag Jurisdiction (MLC Limits)")
             
             all_districts = list(JURISDICTION_DATA.keys())
             default_dist_idx = all_districts.index(extracted["district_name"]) if extracted["district_name"] in all_districts else 0
@@ -358,13 +474,13 @@ with main_tab1:
                 final_village = selected_village
 
             st.markdown("---")
-            st.markdown("##### Reference & Contact Details")
+            st.markdown("##### 🤝 Party Volunteer & Reference Details")
             r1, r2 = st.columns(2)
-            ref_name = r1.text_input("Reference Name", value="Sumanth Muthamala", placeholder="e.g., Local Leader / Volunteer")
-            mobile_no = r2.text_input("Mobile Number", placeholder="10-digit number")
-            remarks = st.text_area("Remarks / Notes", placeholder="e.g., Certificate verified, Ward 4 booth")
+            ref_name = r1.text_input("Party Reference / Cadre Name", value="Sumanth Muthamala", placeholder="e.g., Mandal Incharge / Booth President")
+            mobile_no = r2.text_input("Voter Mobile Number", placeholder="10-digit number")
+            remarks = st.text_area("Remarks / Notes", placeholder="e.g., Degree Certificate verified, BRS party supporter")
 
-            save_btn = st.form_submit_button("💾 Save & Feed to Google Sheet", use_container_width=True)
+            save_btn = st.form_submit_button("🌸 Save & Submit to BRS Voter Database", use_container_width=True)
 
             if save_btn:
                 if not app_id or not name:
@@ -372,7 +488,7 @@ with main_tab1:
                 else:
                     ws, err = get_worksheet()
                     if ws is None:
-                        st.error(f"Google Sheet Connection Failed: {err}")
+                        st.error(f"Database Connection Failed: {err}")
                     else:
                         try:
                             rows = ws.get_all_values()
@@ -382,7 +498,7 @@ with main_tab1:
 
                             if app_id in existing_ids:
                                 log_duplicate(app_id, name, st.session_state.username)
-                                st.warning(f"⚠️ Application ID {app_id} already exists in Google Sheet. Submission blocked and recorded in duplicate counter.")
+                                st.warning(f"⚠️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
                             else:
                                 new_entry = [
                                     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -392,17 +508,16 @@ with main_tab1:
                                     ref_name, mobile_no, remarks, st.session_state.username
                                 ]
                                 ws.append_row(new_entry)
-                                st.success(f"🎉 Successfully saved record for {name} ({app_id}) to Google Sheet!")
+                                st.success(f"🎉 Successfully Ingested: {name} ({app_id}) to BRS Central Records!")
                         except Exception as ex:
                             st.error(f"Error appending row: {ex}")
 
 # ==============================================================================
-# TAB 2: ADMIN ANALYTICS & MANDAL-WISE BREAKDOWN
+# TAB 2: WAR ROOM ANALYTICS & MANDAL BREAKDOWN
 # ==============================================================================
 if st.session_state.role == "Admin":
     with main_tab2:
-        st.title("📊 MLC Graduate Ingestion Dashboard")
-        st.caption("Consolidated analytics from Google Sheets and live duplicate counter")
+        st.markdown("### 📊 Constituency Consolidation Dashboard")
 
         ws, err = get_worksheet()
         if ws is None:
@@ -411,36 +526,35 @@ if st.session_state.role == "Admin":
             try:
                 sheet_data = ws.get_all_values()
                 if len(sheet_data) <= 1:
-                    st.info("No applications recorded in Google Sheets yet.")
+                    st.info("No applications recorded yet.")
                 else:
                     df = pd.DataFrame(sheet_data[1:], columns=sheet_data[0])
 
-                    # Fetch Duplicate Log
                     conn = sqlite3.connect(DB_FILE)
                     dup_df = pd.read_sql_query("SELECT * FROM duplicate_audit ORDER BY id DESC", conn)
                     conn.close()
 
-                    # Top KPI Metrics
+                    # Top KPI Metrics with BRS Pink Cards
                     m1, m2, m3, m4 = st.columns(4)
                     total_votes = len(df)
                     unique_voters = df["Application ID"].nunique() if "Application ID" in df.columns else total_votes
                     duplicate_attempts = len(dup_df)
                     active_operators = df["Operator Username"].nunique() if "Operator Username" in df.columns else 1
 
-                    m1.metric("Total Votes Ingested", f"{total_votes:,}")
-                    m2.metric("Unique Voters", f"{unique_voters:,}")
-                    m3.metric("Duplicates Prevented", f"{duplicate_attempts:,}")
-                    m4.metric("Active Operators", f"{active_operators}")
+                    m1.metric("Total Ingested Votes", f"{total_votes:,}")
+                    m2.metric("Unique Verified Voters", f"{unique_voters:,}")
+                    m3.metric("Duplicates Filtered", f"{duplicate_attempts:,}")
+                    m4.metric("Active War Room Cadre", f"{active_operators}")
 
                     st.divider()
 
-                    # Mandal Breakdown Controls
-                    st.subheader("📍 Jurisdiction Breakdown")
+                    # Mandal-Wise Breakdown
+                    st.subheader("📍 Mandal-Wise Mobilization Breakdown")
                     d_col1, d_col2 = st.columns([1, 2])
 
                     with d_col1:
                         dist_filter = st.selectbox(
-                            "Filter by Tagged District",
+                            "Filter by Revenue District",
                             ["All Districts"] + sorted(list(df["Jurisdiction District"].dropna().unique()))
                         )
 
@@ -448,20 +562,20 @@ if st.session_state.role == "Admin":
 
                     if "Mandal" in filtered_df.columns and not filtered_df.empty:
                         mandal_counts = filtered_df["Mandal"].value_counts().reset_index()
-                        mandal_counts.columns = ["Mandal", "Total Votes Ingested"]
+                        mandal_counts.columns = ["Mandal", "Total Ingested Votes"]
 
                         t_col, c_col = st.columns([1, 1.4])
                         with t_col:
                             st.write(f"**Mandal Summary ({dist_filter})**")
                             st.dataframe(mandal_counts, use_container_width=True, hide_index=True)
                         with c_col:
-                            st.write(f"**Vote Distribution by Mandal**")
-                            st.bar_chart(mandal_counts.set_index("Mandal"))
+                            st.write(f"**Mandal Distribution Chart**")
+                            st.bar_chart(mandal_counts.set_index("Mandal"), color="#E61A8D")
 
                     st.divider()
 
-                    # Duplicate Audit Log
-                    st.subheader("🚨 Live Duplicate Counter & Audit Trail")
+                    # Live Duplicate Counter & Audit Trail
+                    st.subheader("🚨 Live Duplicate Submissions Log")
                     if not dup_df.empty:
                         st.dataframe(
                             dup_df[["timestamp", "application_id", "applicant_name", "operator"]],
@@ -469,10 +583,9 @@ if st.session_state.role == "Admin":
                             hide_index=True
                         )
                     else:
-                        st.caption("No duplicate entry attempts logged yet.")
+                        st.caption("Zero duplicate attempts recorded so far.")
 
-                    # Recent Submissions Viewer
-                    with st.expander("📄 View Latest 50 Ingested Records"):
+                    with st.expander("📄 View Latest 50 Ingested Voter Records"):
                         st.dataframe(df.tail(50), use_container_width=True)
 
             except Exception as e:
