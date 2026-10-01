@@ -17,31 +17,35 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- BACKGROUND LOGO ENCODER ---
-def get_base64_image(image_path):
-    if os.path.exists(image_path):
-        with open(image_path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode()
+# --- BACKGROUND LOGO ENCODER (WEBP / JPG) ---
+def get_base64_logo():
+    for filename in ["brs_logo.webp", "brs_logo.jpg", "brs_logo.png"]:
+        if os.path.exists(filename):
+            ext = filename.split(".")[-1]
+            mime = "image/webp" if ext == "webp" else f"image/{ext}"
+            with open(filename, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+                return f"data:{mime};base64,{b64}"
     return ""
 
-logo_base64 = get_base64_image("brs_logo.jpg")
+logo_data_uri = get_base64_logo()
 
 bg_watermark_css = ""
-if logo_base64:
+if logo_data_uri:
     bg_watermark_css = f"""
     .stApp::before {{
         content: "";
         position: fixed;
-        top: 50%;
+        top: 52%;
         left: 55%;
         transform: translate(-50%, -50%);
-        width: 580px;
-        height: 580px;
-        background-image: url("data:image/jpeg;base64,{logo_base64}");
+        width: 620px;
+        height: 620px;
+        background-image: url("{logo_data_uri}");
         background-repeat: no-repeat;
         background-position: center;
         background-size: contain;
-        opacity: 0.10;
+        opacity: 0.12;
         pointer-events: none;
         z-index: 0;
     }}
@@ -499,7 +503,6 @@ with main_tab1:
             st.markdown("---")
             st.markdown("##### 🤝 Party Volunteer & Reference Details")
             r1, r2 = st.columns(2)
-            # Empty value by default, clean placeholder provided
             ref_name = r1.text_input("Party Reference / Cadre Name", value="", placeholder="Enter Reference / Mandal Incharge Name")
             mobile_no = r2.text_input("Voter Mobile Number", placeholder="10-digit number")
             remarks = st.text_area("Remarks / Notes", placeholder="e.g., Degree Certificate verified, BRS party supporter")
