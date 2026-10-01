@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- BACKGROUND LOGO ENCODER (WEBP / JPG) ---
+# --- BACKGROUND LOGO ENCODER (WEBP / JPG / PNG) ---
 def get_base64_logo():
     for filename in ["brs_logo.webp", "brs_logo.jpg", "brs_logo.png"]:
         if os.path.exists(filename):
@@ -33,21 +33,12 @@ logo_data_uri = get_base64_logo()
 bg_watermark_css = ""
 if logo_data_uri:
     bg_watermark_css = f"""
-    .stApp::before {{
-        content: "";
-        position: fixed;
-        top: 52%;
-        left: 55%;
-        transform: translate(-50%, -50%);
-        width: 620px;
-        height: 620px;
-        background-image: url("{logo_data_uri}");
-        background-repeat: no-repeat;
-        background-position: center;
-        background-size: contain;
-        opacity: 0.12;
-        pointer-events: none;
-        z-index: 0;
+    .stApp {{
+        background-image: url("{logo_data_uri}") !important;
+        background-repeat: no-repeat !important;
+        background-position: center 55% !important;
+        background-size: 550px !important;
+        background-attachment: fixed !important;
     }}
     """
 
@@ -55,50 +46,52 @@ if logo_data_uri:
 st.markdown(f"""
 <style>
 .stApp {{
-    background: linear-gradient(135deg, #FFF0F6 0%, #FFFFFF 60%, #FFE6F0 100%);
+    background-color: #FFF2F7 !important;
     color: #2D3748;
-    position: relative;
 }}
 
 {bg_watermark_css}
 
-/* Banner Styling */
+/* Main Content Wrapper - keeps inputs crisp and fully interactable */
+.main .block-container {{
+    position: relative;
+    z-index: 2;
+}}
+
+/* Top Banner */
 .brs-banner {{
     background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%);
     color: white;
-    padding: 20px 24px;
+    padding: 18px 24px;
     border-radius: 12px;
     box-shadow: 0 4px 15px rgba(230, 26, 141, 0.28);
-    margin-bottom: 24px;
+    margin-bottom: 22px;
     display: flex;
     align-items: center;
     gap: 16px;
-    position: relative;
-    z-index: 1;
 }}
 .brs-car-icon {{
-    font-size: 40px;
-    background: rgba(255, 255, 255, 0.2);
+    font-size: 38px;
+    background: rgba(255, 255, 255, 0.22);
     border-radius: 10px;
     padding: 6px 12px;
     display: inline-block;
 }}
 .brs-banner-text h1 {{
     color: #FFFFFF !important;
-    font-size: 26px !important;
+    font-size: 24px !important;
     font-weight: 800 !important;
     margin: 0 !important;
     padding: 0 !important;
-    letter-spacing: 0.5px;
 }}
 .brs-banner-text p {{
     color: #FCE4EC !important;
-    font-size: 14px !important;
+    font-size: 13px !important;
     margin: 4px 0 0 0 !important;
     font-weight: 500;
 }}
 
-/* BRS Vibrant Pink Buttons */
+/* Primary Buttons */
 div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {{
     background: linear-gradient(90deg, #E61A8D 0%, #D81B60 100%) !important;
     color: white !important;
@@ -111,18 +104,15 @@ div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {
 }}
 div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {{
     background: linear-gradient(90deg, #C2185B 0%, #AD1457 100%) !important;
-    box-shadow: 0 6px 16px rgba(216, 27, 96, 0.45) !important;
 }}
 
-/* Form Container */
+/* Form Container Card */
 [data-testid="stForm"] {{
-    background-color: rgba(255, 255, 255, 0.92) !important;
+    background-color: rgba(255, 255, 255, 0.94) !important;
     border: 1.5px solid #F8BBD0 !important;
     border-radius: 14px !important;
-    padding: 22px !important;
-    box-shadow: 0 4px 14px rgba(230, 26, 141, 0.08) !important;
-    position: relative;
-    z-index: 1;
+    padding: 24px !important;
+    box-shadow: 0 6px 20px rgba(230, 26, 141, 0.12) !important;
 }}
 
 /* Sidebar */
@@ -144,7 +134,7 @@ div[data-testid="stMetricValue"] {{
     font-weight: 800 !important;
 }}
 
-/* Active Tabs */
+/* Tabs Active */
 button[data-baseweb="tab"][aria-selected="true"] {{
     color: #E61A8D !important;
     border-bottom-color: #E61A8D !important;
@@ -367,43 +357,45 @@ if "logged_in" not in st.session_state:
 if not st.session_state.logged_in:
     render_brs_header("BRS MLC GRADUATE VOTER CONSOLE", "Warangal – Khammam – Nalgonda Graduate Constituency Portal | War Room System")
 
-    tab1, tab2 = st.tabs(["🔑 War Room Sign In", "📝 Volunteer / Staff Registration"])
+    col_l, col_center, col_r = st.columns([1, 1.8, 1])
+    with col_center:
+        tab1, tab2 = st.tabs(["🔑 War Room Sign In", "📝 Volunteer Registration"])
 
-    with tab1:
-        with st.form("login_form"):
-            uname = st.text_input("Username")
-            pword = st.text_input("Password", type="password")
-            submit = st.form_submit_button("Sign In to Console", use_container_width=True)
-            if submit:
-                user_info = verify_user(uname, pword)
-                if user_info:
-                    fname, role, status = user_info
-                    if status != "Approved":
-                        st.error("⏳ Account pending War Room Admin approval.")
+        with tab1:
+            with st.form("login_form"):
+                uname = st.text_input("Username", placeholder="e.g. admin")
+                pword = st.text_input("Password", type="password", placeholder="Enter your password")
+                submit = st.form_submit_button("Sign In to Console", use_container_width=True)
+                if submit:
+                    user_info = verify_user(uname, pword)
+                    if user_info:
+                        fname, role, status = user_info
+                        if status != "Approved":
+                            st.error("⏳ Account pending War Room Admin approval.")
+                        else:
+                            st.session_state.logged_in = True
+                            st.session_state.username = uname
+                            st.session_state.role = role
+                            st.session_state.full_name = fname
+                            st.rerun()
                     else:
-                        st.session_state.logged_in = True
-                        st.session_state.username = uname
-                        st.session_state.role = role
-                        st.session_state.full_name = fname
-                        st.rerun()
-                else:
-                    st.error("Invalid credentials.")
+                        st.error("Invalid credentials.")
 
-    with tab2:
-        with st.form("register_form"):
-            new_name = st.text_input("Full Name")
-            new_uname = st.text_input("Desired Username")
-            new_pwd = st.text_input("Password", type="password")
-            reg_submit = st.form_submit_button("Submit Registration", use_container_width=True)
-            if reg_submit:
-                if not new_uname or not new_pwd or not new_name:
-                    st.warning("All fields are required.")
-                else:
-                    ok, msg = register_user(new_uname, new_pwd, new_name)
-                    if ok:
-                        st.success(msg)
+        with tab2:
+            with st.form("register_form"):
+                new_name = st.text_input("Full Name", placeholder="Your Full Name")
+                new_uname = st.text_input("Desired Username", placeholder="Choose username")
+                new_pwd = st.text_input("Password", type="password", placeholder="Create password")
+                reg_submit = st.form_submit_button("Submit Registration", use_container_width=True)
+                if reg_submit:
+                    if not new_uname or not new_pwd or not new_name:
+                        st.warning("All fields are required.")
                     else:
-                        st.error(msg)
+                        ok, msg = register_user(new_uname, new_pwd, new_name)
+                        if ok:
+                            st.success(msg)
+                        else:
+                            st.error(msg)
     st.stop()
 
 # --- SIDEBAR ---
