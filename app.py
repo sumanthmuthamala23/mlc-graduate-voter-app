@@ -17,143 +17,175 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- EMBEDDED LOGO DATA LOADER ---
-def get_logo_path():
-    for filename in ["brs_logo.webp", "brs_logo.jpg", "brs_logo.png"]:
+# --- FULL-PAGE BACKGROUND ENCODER ---
+def get_base64_bg():
+    for filename in ["brs_banner_bg.png", "1461945.png", "brs_banner_bg.jpg"]:
         if os.path.exists(filename):
-            return filename
-    return None
+            ext = filename.split(".")[-1]
+            mime = "image/png" if ext == "png" else "image/jpeg"
+            with open(filename, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+                return f"data:{mime};base64,{b64}"
+    return ""
 
-logo_path = get_logo_path()
+bg_image_uri = get_base64_bg()
 
-# --- BRS THEME CLEAN STYLING ---
-st.markdown("""
-<style>
+# Applied directly across the whole viewport with an overlay tint for readability
+bg_css = ""
+if bg_image_uri:
+    bg_css = f"""
+    .stApp {{
+        background: linear-gradient(rgba(255, 240, 246, 0.45), rgba(255, 240, 246, 0.55)), 
+                    url("{bg_image_uri}") no-repeat center center fixed !important;
+        background-size: cover !important;
+    }}
+    """
+else:
+    bg_css = """
     .stApp {
-        background-color: #FFF6FA !important;
+        background: linear-gradient(135deg, #FFF0F6 0%, #FFFFFF 50%, #FFE6F0 100%) !important;
     }
+    """
+
+# --- BRS CUSTOM THEMED STYLING ---
+st.markdown(f"""
+<style>
+    {bg_css}
+
+    /* Main Container Padding */
+    .main .block-container {{
+        max-width: 1200px;
+        padding-top: 1.5rem;
+        padding-bottom: 3rem;
+    }}
 
     /* Top Banner Header */
-    .brs-banner {
-        background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%);
+    .brs-banner {{
+        background: linear-gradient(90deg, rgba(230, 26, 141, 0.95) 0%, rgba(194, 24, 91, 0.95) 100%);
         color: white !important;
-        padding: 16px 24px;
-        border-radius: 12px;
-        box-shadow: 0 4px 14px rgba(230, 26, 141, 0.25);
-        margin-bottom: 24px;
+        padding: 16px 26px;
+        border-radius: 14px;
+        box-shadow: 0 8px 24px rgba(230, 26, 141, 0.35);
+        margin-bottom: 22px;
         display: flex;
         align-items: center;
-        gap: 15px;
-    }
-    .brs-car-badge {
+        gap: 16px;
+        backdrop-filter: blur(8px);
+    }}
+    .brs-car-badge {{
         font-size: 34px;
-        background: rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.25);
         border-radius: 10px;
         padding: 4px 10px;
-    }
-    .brs-banner h1 {
+    }}
+    .brs-banner h1 {{
         color: #FFFFFF !important;
-        font-size: 22px !important;
+        font-size: 23px !important;
         font-weight: 800 !important;
         margin: 0 !important;
-    }
-    .brs-banner p {
+    }}
+    .brs-banner p {{
         color: #FCE4EC !important;
-        font-size: 13px !important;
-        margin: 2px 0 0 0 !important;
-    }
+        font-size: 13.5px !important;
+        margin: 3px 0 0 0 !important;
+    }}
 
-    /* Clean Card Form */
-    [data-testid="stForm"] {
+    /* Card Forms with Frosted Glassmorphism for High Readability */
+    [data-testid="stForm"] {{
+        background-color: rgba(255, 255, 255, 0.94) !important;
+        border: 2px solid #F8BBD0 !important;
+        border-radius: 16px !important;
+        padding: 26px !important;
+        box-shadow: 0 10px 30px rgba(216, 27, 96, 0.15) !important;
+        backdrop-filter: blur(10px);
+    }}
+
+    /* Input Fields */
+    .stTextInput input, .stSelectbox select, .stTextArea textarea {{
         background-color: #FFFFFF !important;
-        border: 1.5px solid #F5B6CE !important;
-        border-radius: 14px !important;
-        padding: 24px !important;
-        box-shadow: 0 8px 24px rgba(230, 26, 141, 0.10) !important;
-    }
-
-    /* Inputs */
-    .stTextInput input {
-        background-color: #FAFAFC !important;
         border: 1.5px solid #CBD5E1 !important;
         border-radius: 8px !important;
         color: #0F172A !important;
-        font-size: 14px !important;
         font-weight: 500 !important;
-        padding: 8px 12px !important;
-    }
-    .stTextInput input:focus {
+    }}
+    .stTextInput input:focus, .stTextArea textarea:focus {{
         border-color: #E61A8D !important;
-        box-shadow: 0 0 0 2px rgba(230, 26, 141, 0.2) !important;
-    }
+        box-shadow: 0 0 0 2px rgba(230, 26, 141, 0.25) !important;
+    }}
 
-    /* Primary BRS Button */
-    div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {
+    /* Vibrant BRS Pink Action Buttons */
+    div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {{
         background: linear-gradient(90deg, #E61A8D 0%, #D81B60 100%) !important;
         color: white !important;
         font-size: 15px !important;
         font-weight: 700 !important;
-        border-radius: 8px !important;
+        border-radius: 10px !important;
         border: none !important;
-        padding: 10px 20px !important;
-        box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3) !important;
-    }
-    div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {
+        padding: 10px 22px !important;
+        box-shadow: 0 4px 14px rgba(216, 27, 96, 0.35) !important;
+        transition: all 0.2s ease-in-out !important;
+    }}
+    div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {{
         background: linear-gradient(90deg, #C2185B 0%, #AD1457 100%) !important;
-    }
+        box-shadow: 0 6px 18px rgba(216, 27, 96, 0.45) !important;
+        transform: translateY(-1px);
+    }}
 
-    /* Info Instructions Box placed cleanly below Sign In */
-    .info-card {
-        background: #FFFFFF;
-        border-left: 4px solid #E61A8D;
-        border-radius: 10px;
-        padding: 16px 20px;
+    /* Info Instructions Box */
+    .info-card {{
+        background: rgba(255, 255, 255, 0.94);
+        border-left: 5px solid #E61A8D;
+        border-radius: 12px;
+        padding: 18px 22px;
         margin-top: 20px;
-        box-shadow: 0 4px 14px rgba(230, 26, 141, 0.08);
-    }
-    .info-card h4 {
+        box-shadow: 0 6px 20px rgba(230, 26, 141, 0.12);
+        backdrop-filter: blur(8px);
+    }}
+    .info-card h4 {{
         color: #C2185B !important;
         font-size: 16px !important;
         font-weight: 700 !important;
         margin: 0 0 6px 0 !important;
-    }
-    .info-card p {
+    }}
+    .info-card p {{
         color: #334155 !important;
         font-size: 13.5px !important;
         line-height: 1.5 !important;
         margin: 0 0 6px 0 !important;
-    }
+    }}
 
-    /* Tab Highlights */
-    button[data-baseweb="tab"] {
-        font-weight: 600 !important;
-        font-size: 14px !important;
+    /* Tab Headers */
+    button[data-baseweb="tab"] {{
+        font-weight: 700 !important;
+        font-size: 14.5px !important;
         color: #64748B !important;
-    }
-    button[data-baseweb="tab"][aria-selected="true"] {
+    }}
+    button[data-baseweb="tab"][aria-selected="true"] {{
         color: #E61A8D !important;
         border-bottom: 3px solid #E61A8D !important;
         font-weight: 800 !important;
-    }
+    }}
 
-    /* Sidebar */
-    section[data-testid="stSidebar"] {
-        background-color: #FFF7FA !important;
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {{
+        background-color: rgba(255, 245, 249, 0.95) !important;
         border-right: 1.5px solid #F8BBD0 !important;
-    }
+        backdrop-filter: blur(10px);
+    }}
 
-    /* KPI Metrics */
-    div[data-testid="stMetric"] {
-        background: #FFFFFF;
+    /* KPI Metrics Cards */
+    div[data-testid="stMetric"] {{
+        background: rgba(255, 255, 255, 0.94);
         border-left: 5px solid #E61A8D;
-        border-radius: 10px;
-        padding: 14px 18px;
-        box-shadow: 0 2px 10px rgba(230, 26, 141, 0.08);
-    }
-    div[data-testid="stMetricValue"] {
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 16px rgba(230, 26, 141, 0.12);
+        backdrop-filter: blur(8px);
+    }}
+    div[data-testid="stMetricValue"] {{
         color: #C2185B !important;
         font-weight: 800 !important;
-    }
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -370,19 +402,12 @@ if "logged_in" not in st.session_state:
     st.session_state.full_name = None
 
 # ==============================================================================
-# LOGIN SCREEN: LOGO ON LEFT (CLEAN), FORM & WORDS ON RIGHT
+# LOGIN SCREEN OVER THE BRS HERO BANNER
 # ==============================================================================
 if not st.session_state.logged_in:
     render_banner()
 
-    col_logo, col_form = st.columns([1, 1.25], gap="large")
-
-    with col_logo:
-        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-        if logo_path:
-            st.image(logo_path, use_container_width=True)
-        else:
-            st.markdown("<div style='font-size:120px; text-align:center;'>🚗</div>", unsafe_allow_html=True)
+    _, col_form, _ = st.columns([1, 1.6, 1])
 
     with col_form:
         tab1, tab2 = st.tabs(["🔑 War Room Sign In", "📝 Volunteer Registration"])
@@ -423,14 +448,13 @@ if not st.session_state.logged_in:
                         else:
                             st.error(msg)
 
-        # Clear, formatted text placed directly bottom of the Sign In box
         st.markdown("""
         <div class="info-card">
             <h4>🌸 భారత రాష్ట్ర సమితి (BRS) — War Room Console</h4>
             <p><strong>Warangal – Khammam – Nalgonda Graduate MLC Constituency</strong></p>
             <p style="color: #475569;">
-                📌 <strong>Welcome to the Central Voter Intake Portal:</strong><br>
-                Authorized War Room Operators and Volunteers can log in to upload CEO Telangana Form-18 verification slips and synchronize voter records directly to the constituency database.
+                📌 <strong>Central Voter Consolidation Desk:</strong><br>
+                Authorized operators can upload CEO Telangana Form-18 verification slips to process and automatically record valid graduate applications into the centralized database.
             </p>
         </div>
         """, unsafe_allow_html=True)
