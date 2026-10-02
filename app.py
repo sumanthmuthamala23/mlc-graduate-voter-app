@@ -29,7 +29,7 @@ def get_banner_image():
 
 banner_img_path = get_banner_image()
 
-# BRS Styling
+# BRS & Google Lens Custom CSS
 st.markdown("""
 <style>
     .stApp {
@@ -38,11 +38,46 @@ st.markdown("""
     }
 
     .main .block-container {
-        max-width: 1150px;
+        max-width: 1180px;
         padding-top: 1rem;
         padding-bottom: 2.5rem;
     }
 
+    /* Google Lens Scanner Card */
+    .lens-header-card {
+        background: linear-gradient(135deg, #FFFFFF 0%, #FFF5F9 100%);
+        border: 2px solid #F48FB1;
+        border-radius: 14px;
+        padding: 14px 18px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 4px 14px rgba(230, 26, 141, 0.08);
+    }
+    .lens-icon-badge {
+        font-size: 28px;
+        background: linear-gradient(135deg, #E61A8D 0%, #C2185B 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 6px 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .lens-title {
+        font-size: 16px;
+        font-weight: 800;
+        color: #880E4F;
+        margin: 0;
+    }
+    .lens-desc {
+        font-size: 12.5px;
+        color: #64748B;
+        margin: 2px 0 0 0;
+    }
+
+    /* Card Forms */
     [data-testid="stForm"] {
         background: #FFFFFF !important;
         border: 2px solid #F8BBD0 !important;
@@ -324,7 +359,7 @@ def parse_acknowledgement_pdf(file_bytes):
                 full_text += extracted + "\n"
 
         if len(full_text.strip()) < 15:
-            return {}
+            return {}, ""
 
         normalized = re.sub(r'[\r\t\f\v]', ' ', full_text)
         normalized = re.sub(r'[ \xa0]+', ' ', normalized)
@@ -370,40 +405,39 @@ def parse_acknowledgement_pdf(file_bytes):
             r"District\s*[:\-\|]?\s*([A-Za-z\s]+?)(?=\s*Current|\s*Status|\n|$)"
         ])
 
-        # Precision Status Matcher: Prevents pulling "Application Id" into the status box
+        # Precise Status Clean: never allow Application ID to infect Status
         status_match = search_value([
             r"Current\s*Status\s*[:\-\|]?\s*(Submitted|Pending|Approved|Rejected|Verified|In\s*Process)",
             r"Status\s*[:\-\|]?\s*(Submitted|Pending|Approved|Rejected|Verified|In\s*Process)",
             r"\b(Submitted|Pending|Approved|Rejected|Verified)\b"
         ])
-        
-        # Guard: If raw text extraction matched "Application" or an ID string, reset cleanly
         if not status_match or "application" in status_match.lower() or "f18" in status_match.lower():
             status_match = "Submitted"
-            
-        parsed["current_status"] = status_match
-        return parsed
-    except Exception:
-        return {}
 
-# Engine 2: AI Multimodal Vision with Multi-Key Failover
-def parse_with_vision_pool(file_bytes, mime_type, api_keys):
+        parsed["current_status"] = status_match
+        return parsed, normalized
+    except Exception:
+        return {}, ""
+
+# Engine 2: Google Lens Multi-Key Vision Model for Screenshots & JPEGs
+def parse_with_google_lens(file_bytes, mime_type, api_keys):
     if not api_keys:
-        return {}
+        return {}, ""
 
     b64_data = base64.b64encode(file_bytes).decode('utf-8')
-    prompt_text = """Analyze this Form-18 acknowledgement voter slip image and extract these exact fields as JSON:
+    prompt_text = """Act as an advanced Google Lens OCR scanner for this CEO Telangana Form-18 voter acknowledgement receipt screenshot/photo.
+Extract the visible voter details and return ONLY a valid JSON object matching this schema:
 {
-  "application_id": "Application ID or slip number (e.g. F180928310521426)",
-  "applicant_name": "Applicant Name",
+  "application_id": "Application ID / Slip number (e.g. F180928310521426)",
+  "applicant_name": "Full Applicant Name",
   "gender": "Male or Female",
-  "relation_name": "Father or Husband or Relation Name",
+  "relation_name": "Father / Husband / Relation Name",
   "house_number": "House Number",
-  "mlc_constituency": "Constituency Name",
-  "district_name": "District Name",
-  "current_status": "Current status like Submitted or Pending. Do NOT put the Application ID here."
-}
-Return raw JSON only."""
+  "mlc_constituency": "Constituency (e.g. Warangal-Khammam-Nalgonda)",
+  "district_name": "District Name (e.g. Khammam, Nalgonda, Warangal)",
+  "current_status": "Strictly 'Submitted' or 'Pending'. NEVER set this to the Application ID.",
+  "ocr_full_text": "Complete verbatim text detected across the entire image"
+}"""
 
     payload = {
         "contents": [{
@@ -426,43 +460,47 @@ Return raw JSON only."""
                     body = res.json()
                     text_content = body["candidates"][0]["content"]["parts"][0]["text"]
                     data = json.loads(text_content)
-                    # Clean up status field if model confused it with Application ID
+                    
+                    # Safety check on Status
                     st_val = data.get("current_status", "")
                     if "application" in st_val.lower() or "f18" in st_val.lower() or not st_val:
                         data["current_status"] = "Submitted"
-                    return data
+
+                    ocr_raw = data.pop("ocr_full_text", "")
+                    return data, ocr_raw
                 elif res.status_code in [429, 401, 403]:
                     break
             except Exception:
                 continue
 
-    return {}
+    return {}, ""
 
-# Universal Document Router
-def extract_universal_document(uploaded_file, api_keys):
-    filename = uploaded_file.name.lower()
-    file_bytes = uploaded_file.getvalue()
+# Universal Multi-Device Router (PDF, JPG, JPEG, PNG, WEBP)
+def extract_universal_document(uploaded_file, file_bytes, api_keys):
+    filename = uploaded_file.name.lower() if hasattr(uploaded_file, 'name') else "image.jpg"
 
+    # 1. Standard Digital PDF
     if filename.endswith(".pdf"):
-        data = parse_acknowledgement_pdf(file_bytes)
+        data, raw_txt = parse_acknowledgement_pdf(file_bytes)
         if data.get("application_id") or data.get("applicant_name"):
-            return data, "Offline PDF Engine"
+            return data, raw_txt, "PDF Text Engine"
 
-    mime_type = "application/pdf"
-    if filename.endswith((".jpg", ".jpeg")):
-        mime_type = "image/jpeg"
-    elif filename.endswith(".png"):
+    # 2. Photos, Screenshots, JPEGs via Google Lens Vision
+    mime_type = "image/jpeg"
+    if filename.endswith(".png"):
         mime_type = "image/png"
     elif filename.endswith(".webp"):
         mime_type = "image/webp"
+    elif filename.endswith(".pdf"):
+        mime_type = "application/pdf"
 
     if api_keys:
-        vision_data = parse_with_vision_pool(file_bytes, mime_type, api_keys)
-        if vision_data.get("application_id") or vision_data.get("applicant_name"):
-            return vision_data, "AI Vision Engine"
-        return {}, "Vision Error"
+        lens_data, raw_txt = parse_with_google_lens(file_bytes, mime_type, api_keys)
+        if lens_data.get("application_id") or lens_data.get("applicant_name"):
+            return lens_data, raw_txt, "Google Lens AI Module"
+        return {}, "", "Vision Error"
 
-    return {}, "Needs API Key"
+    return {}, "", "Needs API Key"
 
 def verify_user(username, password):
     pwd_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -504,7 +542,7 @@ if "logged_in" not in st.session_state:
 form_fields = [
     "field_app_id", "field_applicant_name", "field_gender",
     "field_relation_name", "field_house_no", "field_constituency",
-    "field_ack_status", "field_ack_district", "last_file_hash"
+    "field_ack_status", "field_ack_district", "last_file_hash", "lens_detected_raw"
 ]
 for f in form_fields:
     if f not in st.session_state:
@@ -560,8 +598,8 @@ if not st.session_state.logged_in:
             <h4>🌸 భారత రాష్ట్ర సమితి (BRS) — War Room Console</h4>
             <p><strong>Warangal – Khammam – Nalgonda Graduate MLC Constituency</strong></p>
             <p style="margin-top: 6px; color: #475569;">
-                📌 <strong>Multi-Device Voter Intake:</strong><br>
-                Accepts original Form-18 PDFs, mobile camera photos, screenshots, and scans across any smartphone or desktop.
+                🔍 <strong>Integrated Google Lens Scanner:</strong><br>
+                Upload any mobile screenshot, WhatsApp photo, or physical paper slip to instantly extract voter acknowledgement details into the system.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -624,20 +662,41 @@ with main_tab1:
     upload_col, data_col = st.columns([1, 1.25], gap="large")
 
     with upload_col:
-        st.markdown("#### 1. Attach Form-18 Slip (PDF / JPG / PNG)")
-        uploaded_doc = st.file_uploader(
-            "Upload Form-18 PDF, Camera Photo, or Screenshot",
-            type=["pdf", "png", "jpg", "jpeg", "webp"],
-            key="form18_universal_uploader"
-        )
+        st.markdown("""
+        <div class="lens-header-card">
+            <div class="lens-icon-badge">🔍</div>
+            <div>
+                <div class="lens-title">Google Lens Form-18 Scanner</div>
+                <div class="lens-desc">Screenshots, WhatsApp Photos, JPEGs, PNGs & PDFs</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        if uploaded_doc is not None:
-            current_bytes = uploaded_doc.getvalue()
-            current_hash = hashlib.md5(current_bytes).hexdigest()
+        input_choice = st.radio("Choose Input Method:", ["📁 Upload File (Screenshot/JPEG/PDF)", "📷 Live Camera Scan"], horizontal=True)
+
+        target_file_obj = None
+        target_bytes = None
+
+        if input_choice == "📁 Upload File (Screenshot/JPEG/PDF)":
+            target_file_obj = st.file_uploader(
+                "Drop Form-18 Screenshot or Document",
+                type=["pdf", "png", "jpg", "jpeg", "webp"],
+                key="form18_universal_uploader"
+            )
+            if target_file_obj:
+                target_bytes = target_file_obj.getvalue()
+        else:
+            cam_pic = st.camera_input("Point camera at Form-18 slip", key="form18_camera_scanner")
+            if cam_pic:
+                target_file_obj = cam_pic
+                target_bytes = cam_pic.getvalue()
+
+        if target_bytes:
+            current_hash = hashlib.md5(target_bytes).hexdigest()
 
             if st.session_state["last_file_hash"] != current_hash:
-                with st.spinner("⚡ Extracting voter details from document..."):
-                    extracted_info, engine_used = extract_universal_document(uploaded_doc, configured_keys)
+                with st.spinner("🔍 Google Lens is scanning document text..."):
+                    extracted_info, raw_ocr, engine_used = extract_universal_document(target_file_obj, target_bytes, configured_keys)
 
                     if extracted_info.get("application_id") or extracted_info.get("applicant_name"):
                         st.session_state["field_app_id"] = extracted_info.get("application_id", "")
@@ -648,17 +707,23 @@ with main_tab1:
                         st.session_state["field_constituency"] = extracted_info.get("mlc_constituency", "") or "Warangal-Khammam-Nalgonda"
                         st.session_state["field_ack_status"] = extracted_info.get("current_status", "Submitted")
                         st.session_state["field_ack_district"] = extracted_info.get("district_name", "")
+                        st.session_state["lens_detected_raw"] = raw_ocr
                         st.session_state["last_file_hash"] = current_hash
                         st.session_state["last_engine"] = engine_used
                         st.rerun()
                     elif engine_used == "Needs API Key":
-                        st.warning("📸 For photo/camera images, please configure GEMINI_API_KEYS in Streamlit Secrets.")
+                        st.warning("📸 Please configure GEMINI_API_KEYS in Streamlit Secrets.")
                     else:
-                        st.error("Could not automatically parse text. Please ensure the document is clear or enter the details manually.")
+                        st.error("Could not parse text. Ensure the screenshot is clear or enter the details manually.")
 
         if st.session_state["field_app_id"]:
             engine_label = st.session_state.get("last_engine", "Extracted")
-            st.success(f"✅ {engine_label}: **{st.session_state['field_applicant_name']}** (`{st.session_state['field_app_id']}`)")
+            st.success(f"✅ **{engine_label}**: Detected **{st.session_state['field_applicant_name']}** (`{st.session_state['field_app_id']}`)")
+            
+            # Google Lens Raw Text Inspection Drawer
+            if st.session_state["lens_detected_raw"]:
+                with st.expander("📋 Lens Detected Raw Text"):
+                    st.text(st.session_state["lens_detected_raw"][:800])
 
     with data_col:
         st.markdown("#### 2. Review & Tag Jurisdiction Details")
