@@ -1,5 +1,8 @@
 streamlit
 pypdf
+pandas
 gspread
 google-auth
-pandas
+pillow
+pytesseract
+requests
