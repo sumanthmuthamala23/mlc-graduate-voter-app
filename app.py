@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- BACKGROUND LOGO ENCODER (WEBP / JPG / PNG) ---
+# --- EMBEDDED WATERMARK LOGO ---
 def get_base64_logo():
     for filename in ["brs_logo.webp", "brs_logo.jpg", "brs_logo.png"]:
         if os.path.exists(filename):
@@ -30,151 +30,79 @@ def get_base64_logo():
 
 logo_data_uri = get_base64_logo()
 
-# Subtly dimmed watermark overlay behind clean glassmorphism card
-bg_watermark_css = ""
+watermark_style = ""
 if logo_data_uri:
-    bg_watermark_css = f"""
-    .stApp::before {{
-        content: "";
-        position: fixed;
-        top: 55%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 520px;
-        height: 520px;
+    watermark_style = f"""
         background-image: url("{logo_data_uri}");
         background-repeat: no-repeat;
-        background-position: center;
-        background-size: contain;
-        opacity: 0.08 !important;
-        pointer-events: none;
-        z-index: 0;
-    }}
+        background-position: center 60%;
+        background-size: 480px;
+        background-attachment: fixed;
     """
 
-# --- BRS THEME CUSTOM CSS ---
+# --- BULLETPROOF BRS STYLING ---
 st.markdown(f"""
 <style>
-.stApp {{
-    background: linear-gradient(135deg, #FFF0F5 0%, #FFFFFF 50%, #FFEBF2 100%) !important;
-    color: #1A202C;
-    position: relative;
-}}
+    .stApp {{
+        background-color: #FFF2F7;
+        {watermark_style}
+    }}
 
-{bg_watermark_css}
+    .brs-banner {{
+        background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%);
+        color: white !important;
+        padding: 18px 24px;
+        border-radius: 12px;
+        box-shadow: 0 4px 14px rgba(230, 26, 141, 0.25);
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }}
+    .brs-car-badge {{
+        font-size: 36px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+        padding: 4px 10px;
+    }}
+    .brs-banner h1 {{
+        color: #FFFFFF !important;
+        font-size: 22px !important;
+        font-weight: 800 !important;
+        margin: 0 !important;
+    }}
+    .brs-banner p {{
+        color: #FCE4EC !important;
+        font-size: 13px !important;
+        margin: 3px 0 0 0 !important;
+    }}
 
-.main .block-container {{
-    position: relative;
-    z-index: 1;
-    max-width: 1100px;
-    padding-top: 2rem;
-}}
+    /* Card styling without breaking DOM tree */
+    [data-testid="stForm"] {{
+        background-color: rgba(255, 255, 255, 0.95) !important;
+        border: 1.5px solid #F8BBD0 !important;
+        border-radius: 12px !important;
+        padding: 24px !important;
+        box-shadow: 0 6px 18px rgba(230, 26, 141, 0.12) !important;
+    }}
 
-/* Top Banner Header */
-.brs-banner {{
-    background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%);
-    color: white;
-    padding: 22px 28px;
-    border-radius: 14px;
-    box-shadow: 0 8px 24px rgba(230, 26, 141, 0.25);
-    margin-bottom: 24px;
-    display: flex;
-    align-items: center;
-    gap: 18px;
-}}
-.brs-car-icon {{
-    font-size: 42px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
-    padding: 6px 14px;
-    display: inline-block;
-    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.2);
-}}
-.brs-banner-text h1 {{
-    color: #FFFFFF !important;
-    font-size: 24px !important;
-    font-weight: 800 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    letter-spacing: 0.5px;
-}}
-.brs-banner-text p {{
-    color: #FCE4EC !important;
-    font-size: 13px !important;
-    margin: 4px 0 0 0 !important;
-    font-weight: 500;
-}}
+    /* Primary BRS Buttons */
+    div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {{
+        background: linear-gradient(90deg, #E61A8D 0%, #D81B60 100%) !important;
+        color: white !important;
+        font-size: 15px !important;
+        font-weight: 700 !important;
+        border-radius: 8px !important;
+        border: none !important;
+        padding: 10px 20px !important;
+        box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3) !important;
+    }}
 
-/* Crisp, Solid High-Contrast Form Box */
-[data-testid="stForm"] {{
-    background: #FFFFFF !important;
-    border: 1.5px solid #F3C4D8 !important;
-    border-radius: 16px !important;
-    padding: 28px !important;
-    box-shadow: 0 12px 32px rgba(230, 26, 141, 0.12) !important;
-}}
-
-/* Text Input Fields */
-.stTextInput input {{
-    background-color: #FAFAFC !important;
-    border: 1px solid #E2E8F0 !important;
-    border-radius: 8px !important;
-    color: #1A202C !important;
-    font-weight: 500 !important;
-}}
-.stTextInput input:focus {{
-    border-color: #E61A8D !important;
-    box-shadow: 0 0 0 2px rgba(230, 26, 141, 0.2) !important;
-}}
-
-/* BRS Pink Action Buttons */
-div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {{
-    background: linear-gradient(90deg, #E61A8D 0%, #D81B60 100%) !important;
-    color: white !important;
-    font-size: 15px !important;
-    font-weight: 700 !important;
-    border-radius: 10px !important;
-    border: none !important;
-    padding: 10px 24px !important;
-    box-shadow: 0 4px 14px rgba(216, 27, 96, 0.35) !important;
-    transition: all 0.2s ease-in-out !important;
-}}
-div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {{
-    background: linear-gradient(90deg, #C2185B 0%, #AD1457 100%) !important;
-    box-shadow: 0 6px 18px rgba(216, 27, 96, 0.45) !important;
-    transform: translateY(-1px);
-}}
-
-/* Tabs Styling */
-button[data-baseweb="tab"] {{
-    font-weight: 600 !important;
-    font-size: 14px !important;
-    color: #718096 !important;
-}}
-button[data-baseweb="tab"][aria-selected="true"] {{
-    color: #E61A8D !important;
-    border-bottom: 3px solid #E61A8D !important;
-    font-weight: 800 !important;
-}}
-
-/* Sidebar */
-section[data-testid="stSidebar"] {{
-    background-color: #FFF7FA !important;
-    border-right: 1.5px solid #F8BBD0 !important;
-}}
-
-/* Metric Cards */
-div[data-testid="stMetric"] {{
-    background: #FFFFFF;
-    border-left: 5px solid #E61A8D;
-    border-radius: 10px;
-    padding: 14px 18px;
-    box-shadow: 0 2px 10px rgba(230, 26, 141, 0.08);
-}}
-div[data-testid="stMetricValue"] {{
-    color: #C2185B !important;
-    font-weight: 800 !important;
-}}
+    button[data-baseweb="tab"][aria-selected="true"] {{
+        color: #E61A8D !important;
+        border-bottom-color: #E61A8D !important;
+        font-weight: 700 !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -188,10 +116,18 @@ HEADERS = [
     "Reference Name", "Mobile Number", "Remarks", "Operator Username"
 ]
 
-def render_brs_header(title="BRS MLC GRADUATE VOTER CONSOLE", subtitle="Warangal – Khammam – Nalgonda Graduate Constituency Portal | War Room System"):
-    st.markdown(f"""<div class="brs-banner"><div class="brs-car-icon">🚗</div><div class="brs-banner-text"><h1>{title}</h1><p>{subtitle}</p></div></div>""", unsafe_allow_html=True)
+def render_banner(title="BRS MLC GRADUATE VOTER CONSOLE", sub="Warangal – Khammam – Nalgonda Graduate Constituency Portal | War Room System"):
+    st.markdown(f"""
+    <div class="brs-banner">
+        <div class="brs-car-badge">🚗</div>
+        <div>
+            <h1>{title}</h1>
+            <p>{sub}</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# --- DATABASE SETUP ---
+# --- LOCAL DATABASE SETUP ---
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -218,7 +154,7 @@ def init_db():
 
 init_db()
 
-# --- 11 REVENUE DISTRICTS JURISDICTION ---
+# --- JURISDICTION HIERARCHY ---
 JURISDICTION_DATA = {
     "Khammam": {
         "Khammam Urban": ["Khammam (M Corp)", "Khanapuram Haveli", "Dhamsalapuram", "Mallemadugu"],
@@ -295,16 +231,12 @@ JURISDICTION_DATA = {
     }
 }
 
-# --- DUAL CREDENTIAL CONNECTOR (LOCAL + STREAMLIT CLOUD) ---
+# --- GOOGLE SHEETS CONNECTOR (LOCAL + CLOUD) ---
 def get_worksheet():
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
+    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds = None
     if "gcp_service_account" in st.secrets:
-        creds_dict = dict(st.secrets["gcp_service_account"])
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        creds = Credentials.from_service_account_info(dict(st.secrets["gcp_service_account"]), scopes=scopes)
     elif os.path.exists("service_account.json"):
         creds = Credentials.from_service_account_file("service_account.json", scopes=scopes)
     else:
@@ -312,15 +244,14 @@ def get_worksheet():
 
     try:
         gc = gspread.authorize(creds)
-        spreadsheet = gc.open_by_key(SHEET_ID)
-        sheet = spreadsheet.sheet1
-        existing_rows = sheet.get_all_values()
-        if not existing_rows or existing_rows[0] != HEADERS:
-            if not existing_rows:
-                sheet.append_row(HEADERS)
+        sh = gc.open_by_key(SHEET_ID).sheet1
+        rows = sh.get_all_values()
+        if not rows or rows[0] != HEADERS:
+            if not rows:
+                sh.append_row(HEADERS)
             else:
-                sheet.insert_row(HEADERS, index=1)
-        return sheet, None
+                sh.insert_row(HEADERS, index=1)
+        return sh, None
     except Exception as e:
         return None, str(e)
 
@@ -346,8 +277,7 @@ def parse_acknowledgement_pdf(file_obj):
     for key, regex in patterns.items():
         match = re.search(regex, text, re.IGNORECASE)
         val = match.group(1).strip() if match else ""
-        val = val.replace("$", "").strip()
-        parsed[key] = val
+        parsed[key] = val.replace("$", "").strip()
 
     return parsed
 
@@ -381,25 +311,28 @@ def log_duplicate(app_id, name, operator):
     conn.commit()
     conn.close()
 
-# --- SESSION INITIALIZATION ---
+# --- AUTH STATE ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = None
     st.session_state.role = None
     st.session_state.full_name = None
 
-# --- AUTH LOGIN SCREEN ---
+# ==============================================================================
+# LOGIN / REGISTRATION SCREEN
+# ==============================================================================
 if not st.session_state.logged_in:
-    render_brs_header("BRS MLC GRADUATE VOTER CONSOLE", "Warangal – Khammam – Nalgonda Graduate Constituency Portal | War Room System")
+    render_banner()
 
-    col_l, col_center, col_r = st.columns([1, 1.6, 1])
-    with col_center:
+    _, col_form, _ = st.columns([1, 1.6, 1])
+
+    with col_form:
         tab1, tab2 = st.tabs(["🔑 War Room Sign In", "📝 Volunteer Registration"])
 
         with tab1:
             with st.form("login_form"):
                 uname = st.text_input("Username", placeholder="e.g. admin")
-                pword = st.text_input("Password", type="password", placeholder="Enter your password")
+                pword = st.text_input("Password", type="password", placeholder="Enter password")
                 submit = st.form_submit_button("Sign In to Console", use_container_width=True)
                 if submit:
                     user_info = verify_user(uname, pword)
@@ -414,7 +347,7 @@ if not st.session_state.logged_in:
                             st.session_state.full_name = fname
                             st.rerun()
                     else:
-                        st.error("Invalid credentials.")
+                        st.error("Invalid Username or Password.")
 
         with tab2:
             with st.form("register_form"):
@@ -433,9 +366,16 @@ if not st.session_state.logged_in:
                             st.error(msg)
     st.stop()
 
-# --- SIDEBAR ---
+# ==============================================================================
+# AUTHENTICATED WORKSPACE
+# ==============================================================================
 with st.sidebar:
-    st.markdown("""<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;"><span style="font-size: 26px;">🚗</span><h3 style="margin: 0; color: #E61A8D;">BRS War Room</h3></div>""", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+        <span style="font-size:24px;">🚗</span>
+        <h3 style="margin:0; color:#E61A8D;">BRS War Room</h3>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown(f"**Operator:** {st.session_state.full_name}")
     st.markdown(f"**Role:** `{st.session_state.role}`")
     if st.button("Log Out", use_container_width=True):
@@ -463,17 +403,14 @@ with st.sidebar:
         else:
             st.caption("No pending registrations.")
 
-# --- MAIN WORKSPACE ---
-render_brs_header("BRS MLC GRADUATE VOTER CONSOLE", "Consolidating Form-18 Applications | Warangal – Khammam – Nalgonda (కారు గుర్తుకే మన ఓటు)")
+render_banner("BRS MLC GRADUATE VOTER CONSOLE", "Consolidating Form-18 Applications | Warangal – Khammam – Nalgonda (కారు గుర్తుకే మన ఓటు)")
 
 if st.session_state.role == "Admin":
     main_tab1, main_tab2 = st.tabs(["📥 Data Ingestion & Form-18 Processing", "📊 War Room Analytics & Mandal Breakdown"])
 else:
     main_tab1 = st.container()
 
-# ==============================================================================
 # TAB 1: FORM-18 ENTRY
-# ==============================================================================
 with main_tab1:
     upload_col, data_col = st.columns([1, 1.25], gap="large")
 
@@ -521,11 +458,7 @@ with main_tab1:
             
             available_villages = JURISDICTION_DATA[selected_district][selected_mandal] + ["Other / Unlisted"]
             selected_village = st.selectbox("Select Revenue Village / Ward", available_villages)
-            
-            if selected_village == "Other / Unlisted":
-                final_village = st.text_input("Enter Revenue Village Name")
-            else:
-                final_village = selected_village
+            final_village = st.text_input("Enter Revenue Village Name") if selected_village == "Other / Unlisted" else selected_village
 
             st.markdown("---")
             st.markdown("##### 🤝 Party Volunteer & Reference Details")
@@ -566,9 +499,7 @@ with main_tab1:
                         except Exception as ex:
                             st.error(f"Error appending row: {ex}")
 
-# ==============================================================================
-# TAB 2: WAR ROOM ANALYTICS & MANDAL BREAKDOWN
-# ==============================================================================
+# TAB 2: WAR ROOM ANALYTICS
 if st.session_state.role == "Admin":
     with main_tab2:
         st.markdown("### 📊 Constituency Consolidation Dashboard")
@@ -602,7 +533,7 @@ if st.session_state.role == "Admin":
                     st.divider()
 
                     st.subheader("📍 Mandal-Wise Mobilization Breakdown")
-                    d_col1, d_col2 = st.columns([1, 2])
+                    d_col1, _ = st.columns([1, 2])
 
                     with d_col1:
                         dist_filter = st.selectbox(
