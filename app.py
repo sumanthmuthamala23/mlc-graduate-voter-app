@@ -17,148 +17,146 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- FULL-PAGE BACKGROUND ENCODER ---
-def get_base64_bg():
-    for filename in ["brs_banner_bg.png", "1461945.png", "brs_banner_bg.jpg"]:
+# --- BANNER IMAGE BASE64 ENCODER ---
+def get_banner_base64():
+    for filename in ["brs_banner_bg.png", "1461945.png", "brs_banner_bg.jpg", "brs_logo.webp", "brs_logo.jpg"]:
         if os.path.exists(filename):
             ext = filename.split(".")[-1]
-            mime = "image/png" if ext == "png" else "image/jpeg"
+            mime = "image/png" if ext == "png" else ("image/webp" if ext == "webp" else "image/jpeg")
             with open(filename, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode()
                 return f"data:{mime};base64,{b64}"
     return ""
 
-bg_image_uri = get_base64_bg()
+banner_data_uri = get_banner_base64()
 
-# Applied directly across the whole viewport with an overlay tint for readability
-bg_css = ""
-if bg_image_uri:
-    bg_css = f"""
-    .stApp {{
-        background: linear-gradient(rgba(255, 240, 246, 0.45), rgba(255, 240, 246, 0.55)), 
-                    url("{bg_image_uri}") no-repeat center center fixed !important;
-        background-size: cover !important;
-    }}
+# Header banner styling using the uploaded image
+banner_bg_style = ""
+if banner_data_uri:
+    banner_bg_style = f"""
+        background: linear-gradient(rgba(194, 24, 91, 0.40), rgba(136, 14, 79, 0.70)), 
+                    url("{banner_data_uri}") center center / cover no-repeat !important;
     """
 else:
-    bg_css = """
-    .stApp {
-        background: linear-gradient(135deg, #FFF0F6 0%, #FFFFFF 50%, #FFE6F0 100%) !important;
-    }
+    banner_bg_style = """
+        background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%) !important;
     """
 
-# --- BRS CUSTOM THEMED STYLING ---
+# --- CSS STYLING: HIGH-CONTRAST HIGHLIGHTED INPUTS ---
 st.markdown(f"""
 <style>
-    {bg_css}
+    /* Clean, soft blush background without distracting page-wide clutter */
+    .stApp {{
+        background: linear-gradient(180deg, #FFF0F6 0%, #FFFFFF 60%, #FFF5F9 100%) !important;
+        color: #1E293B;
+    }}
 
-    /* Main Container Padding */
+    /* Main container padding */
     .main .block-container {{
-        max-width: 1200px;
-        padding-top: 1.5rem;
-        padding-bottom: 3rem;
+        max-width: 1180px;
+        padding-top: 1.2rem;
+        padding-bottom: 2.5rem;
     }}
 
-    /* Top Banner Header */
-    .brs-banner {{
-        background: linear-gradient(90deg, rgba(230, 26, 141, 0.95) 0%, rgba(194, 24, 91, 0.95) 100%);
-        color: white !important;
-        padding: 16px 26px;
-        border-radius: 14px;
-        box-shadow: 0 8px 24px rgba(230, 26, 141, 0.35);
-        margin-bottom: 22px;
+    /* Top Hero Banner matching the BRS image */
+    .brs-hero-banner {{
+        {banner_bg_style}
+        min-height: 160px;
+        border-radius: 18px;
+        padding: 24px 30px;
         display: flex;
-        align-items: center;
-        gap: 16px;
-        backdrop-filter: blur(8px);
+        flex-direction: column;
+        justify-content: center;
+        box-shadow: 0 10px 25px rgba(230, 26, 141, 0.25);
+        margin-bottom: 24px;
+        border: 2px solid rgba(255, 255, 255, 0.4);
     }}
-    .brs-car-badge {{
-        font-size: 34px;
-        background: rgba(255, 255, 255, 0.25);
-        border-radius: 10px;
-        padding: 4px 10px;
-    }}
-    .brs-banner h1 {{
+    .brs-hero-banner h1 {{
         color: #FFFFFF !important;
-        font-size: 23px !important;
-        font-weight: 800 !important;
+        font-size: 28px !important;
+        font-weight: 900 !important;
         margin: 0 !important;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+        letter-spacing: 0.5px;
     }}
-    .brs-banner p {{
-        color: #FCE4EC !important;
-        font-size: 13.5px !important;
-        margin: 3px 0 0 0 !important;
+    .brs-hero-banner p {{
+        color: #FFF0F5 !important;
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        margin: 6px 0 0 0 !important;
+        text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
     }}
 
-    /* Card Forms with Frosted Glassmorphism for High Readability */
+    /* Highlighted Sign-In Card Container */
+    .highlight-card {{
+        background: #FFFFFF !important;
+        border-radius: 18px !important;
+        padding: 30px 28px !important;
+        box-shadow: 0 14px 35px rgba(230, 26, 141, 0.18), 0 2px 8px rgba(0,0,0,0.04) !important;
+        border: 2px solid #F8BBD0 !important;
+    }}
+
+    /* Form Container */
     [data-testid="stForm"] {{
-        background-color: rgba(255, 255, 255, 0.94) !important;
+        background: #FFFFFF !important;
         border: 2px solid #F8BBD0 !important;
         border-radius: 16px !important;
-        padding: 26px !important;
-        box-shadow: 0 10px 30px rgba(216, 27, 96, 0.15) !important;
-        backdrop-filter: blur(10px);
+        padding: 26px 24px !important;
+        box-shadow: 0 10px 30px rgba(230, 26, 141, 0.12) !important;
     }}
 
-    /* Input Fields */
-    .stTextInput input, .stSelectbox select, .stTextArea textarea {{
-        background-color: #FFFFFF !important;
-        border: 1.5px solid #CBD5E1 !important;
-        border-radius: 8px !important;
-        color: #0F172A !important;
-        font-weight: 500 !important;
-    }}
-    .stTextInput input:focus, .stTextArea textarea:focus {{
-        border-color: #E61A8D !important;
-        box-shadow: 0 0 0 2px rgba(230, 26, 141, 0.25) !important;
-    }}
-
-    /* Vibrant BRS Pink Action Buttons */
-    div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {{
-        background: linear-gradient(90deg, #E61A8D 0%, #D81B60 100%) !important;
-        color: white !important;
-        font-size: 15px !important;
+    /* Highlighted Input Labels */
+    label[data-testid="stWidgetLabel"] p {{
+        font-size: 14.5px !important;
         font-weight: 700 !important;
+        color: #880E4F !important;
+        margin-bottom: 4px !important;
+    }}
+
+    /* Highlighted Input Boxes */
+    .stTextInput input {{
+        background-color: #FFF9FB !important;
+        border: 2px solid #F48FB1 !important;
         border-radius: 10px !important;
-        border: none !important;
-        padding: 10px 22px !important;
-        box-shadow: 0 4px 14px rgba(216, 27, 96, 0.35) !important;
+        color: #0F172A !important;
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        padding: 11px 15px !important;
+        box-shadow: inset 0 2px 4px rgba(230, 26, 141, 0.05) !important;
         transition: all 0.2s ease-in-out !important;
     }}
-    div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {{
-        background: linear-gradient(90deg, #C2185B 0%, #AD1457 100%) !important;
-        box-shadow: 0 6px 18px rgba(216, 27, 96, 0.45) !important;
-        transform: translateY(-1px);
+    .stTextInput input:focus {{
+        background-color: #FFFFFF !important;
+        border-color: #E61A8D !important;
+        box-shadow: 0 0 0 3px rgba(230, 26, 141, 0.25) !important;
     }}
 
-    /* Info Instructions Box */
-    .info-card {{
-        background: rgba(255, 255, 255, 0.94);
-        border-left: 5px solid #E61A8D;
-        border-radius: 12px;
-        padding: 18px 22px;
-        margin-top: 20px;
-        box-shadow: 0 6px 20px rgba(230, 26, 141, 0.12);
-        backdrop-filter: blur(8px);
-    }}
-    .info-card h4 {{
-        color: #C2185B !important;
+    /* Highlighted Sign In to Console Button */
+    div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {{
+        background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%) !important;
+        color: #FFFFFF !important;
         font-size: 16px !important;
-        font-weight: 700 !important;
-        margin: 0 0 6px 0 !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.5px !important;
+        border-radius: 10px !important;
+        border: none !important;
+        padding: 12px 24px !important;
+        box-shadow: 0 6px 18px rgba(230, 26, 141, 0.40) !important;
+        transition: all 0.2s ease-in-out !important;
+        margin-top: 10px !important;
     }}
-    .info-card p {{
-        color: #334155 !important;
-        font-size: 13.5px !important;
-        line-height: 1.5 !important;
-        margin: 0 0 6px 0 !important;
+    div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {{
+        background: linear-gradient(90deg, #C2185B 0%, #880E4F 100%) !important;
+        box-shadow: 0 8px 24px rgba(230, 26, 141, 0.55) !important;
+        transform: translateY(-2px);
     }}
 
-    /* Tab Headers */
+    /* Tabs Styling */
     button[data-baseweb="tab"] {{
         font-weight: 700 !important;
-        font-size: 14.5px !important;
+        font-size: 15px !important;
         color: #64748B !important;
+        padding: 10px 18px !important;
     }}
     button[data-baseweb="tab"][aria-selected="true"] {{
         color: #E61A8D !important;
@@ -166,21 +164,44 @@ st.markdown(f"""
         font-weight: 800 !important;
     }}
 
+    /* Information Card Below Form */
+    .portal-info-box {{
+        background: linear-gradient(135deg, #FFFFFF 0%, #FFF5F9 100%);
+        border-left: 5px solid #E61A8D;
+        border-radius: 12px;
+        padding: 18px 22px;
+        margin-top: 20px;
+        box-shadow: 0 4px 16px rgba(230, 26, 141, 0.10);
+        border-top: 1px solid #FCE4EC;
+        border-right: 1px solid #FCE4EC;
+        border-bottom: 1px solid #FCE4EC;
+    }}
+    .portal-info-box h4 {{
+        color: #AD1457 !important;
+        font-size: 16px !important;
+        font-weight: 800 !important;
+        margin: 0 0 6px 0 !important;
+    }}
+    .portal-info-box p {{
+        color: #334155 !important;
+        font-size: 13.5px !important;
+        line-height: 1.55 !important;
+        margin: 0 !important;
+    }}
+
     /* Sidebar Styling */
     section[data-testid="stSidebar"] {{
-        background-color: rgba(255, 245, 249, 0.95) !important;
+        background-color: #FFF7FA !important;
         border-right: 1.5px solid #F8BBD0 !important;
-        backdrop-filter: blur(10px);
     }}
 
     /* KPI Metrics Cards */
     div[data-testid="stMetric"] {{
-        background: rgba(255, 255, 255, 0.94);
+        background: #FFFFFF;
         border-left: 5px solid #E61A8D;
         border-radius: 12px;
         padding: 16px 20px;
-        box-shadow: 0 4px 16px rgba(230, 26, 141, 0.12);
-        backdrop-filter: blur(8px);
+        box-shadow: 0 4px 16px rgba(230, 26, 141, 0.10);
     }}
     div[data-testid="stMetricValue"] {{
         color: #C2185B !important;
@@ -199,14 +220,11 @@ HEADERS = [
     "Reference Name", "Mobile Number", "Remarks", "Operator Username"
 ]
 
-def render_banner(title="BRS MLC GRADUATE VOTER CONSOLE", sub="Warangal – Khammam – Nalgonda Graduate Constituency Portal | War Room System"):
+def render_banner(title="BRS MLC GRADUATE VOTER CONSOLE", sub="Warangal – Khammam – Nalgonda Graduate Constituency | War Room Portal (కారు గుర్తుకే మన ఓటు)"):
     st.markdown(f"""
-    <div class="brs-banner">
-        <div class="brs-car-badge">🚗</div>
-        <div>
-            <h1>{title}</h1>
-            <p>{sub}</p>
-        </div>
+    <div class="brs-hero-banner">
+        <h1>🚗 {title}</h1>
+        <p>{sub}</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -402,12 +420,12 @@ if "logged_in" not in st.session_state:
     st.session_state.full_name = None
 
 # ==============================================================================
-# LOGIN SCREEN OVER THE BRS HERO BANNER
+# HIGHLIGHTED SIGN IN / REGISTRATION INTERFACE
 # ==============================================================================
 if not st.session_state.logged_in:
     render_banner()
 
-    _, col_form, _ = st.columns([1, 1.6, 1])
+    _, col_form, _ = st.columns([1, 1.8, 1])
 
     with col_form:
         tab1, tab2 = st.tabs(["🔑 War Room Sign In", "📝 Volunteer Registration"])
@@ -415,8 +433,8 @@ if not st.session_state.logged_in:
         with tab1:
             with st.form("login_form"):
                 uname = st.text_input("Username", placeholder="e.g. admin")
-                pword = st.text_input("Password", type="password", placeholder="Enter password")
-                submit = st.form_submit_button("Sign In to Console", use_container_width=True)
+                pword = st.text_input("Password", type="password", placeholder="Enter your password")
+                submit = st.form_submit_button("🚀 Sign In to Console", use_container_width=True)
                 if submit:
                     user_info = verify_user(uname, pword)
                     if user_info:
@@ -449,12 +467,12 @@ if not st.session_state.logged_in:
                             st.error(msg)
 
         st.markdown("""
-        <div class="info-card">
+        <div class="portal-info-box">
             <h4>🌸 భారత రాష్ట్ర సమితి (BRS) — War Room Console</h4>
             <p><strong>Warangal – Khammam – Nalgonda Graduate MLC Constituency</strong></p>
-            <p style="color: #475569;">
+            <p style="margin-top: 6px; color: #475569;">
                 📌 <strong>Central Voter Consolidation Desk:</strong><br>
-                Authorized operators can upload CEO Telangana Form-18 verification slips to process and automatically record valid graduate applications into the centralized database.
+                Authorized War Room operators and volunteers can upload Form-18 slips to parse, verify duplicates, and automatically synchronize voter records with Google Sheets.
             </p>
         </div>
         """, unsafe_allow_html=True)
