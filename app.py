@@ -7,6 +7,7 @@ import sqlite3
 import hashlib
 import re
 import os
+import io
 from datetime import datetime
 
 st.set_page_config(
@@ -16,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Locate the poster image in the repository
+# Locate poster image if available
 def get_banner_image():
     for filename in ["brs_banner_bg.png", "1461945.png", "brs_banner_bg.jpg", "brs_logo.webp", "brs_logo.jpg"]:
         if os.path.exists(filename):
@@ -28,26 +29,15 @@ banner_img_path = get_banner_image()
 # Clean BRS Styling
 st.markdown("""
 <style>
-    /* Clean base page background */
     .stApp {
         background: linear-gradient(180deg, #FFF0F6 0%, #FFFFFF 50%, #FFEBF2 100%) !important;
         color: #1E293B;
     }
 
-    /* Page container width */
     .main .block-container {
-        max-width: 1100px;
+        max-width: 1150px;
         padding-top: 1rem;
         padding-bottom: 2.5rem;
-    }
-
-    /* Styled Poster Wrapper with glow and rounded corners */
-    .banner-container {
-        border-radius: 18px;
-        overflow: hidden;
-        box-shadow: 0 10px 30px rgba(230, 26, 141, 0.22);
-        margin-bottom: 22px;
-        border: 2px solid #F8BBD0;
     }
 
     /* Card Forms */
@@ -55,33 +45,26 @@ st.markdown("""
         background: #FFFFFF !important;
         border: 2px solid #F8BBD0 !important;
         border-radius: 16px !important;
-        padding: 26px 24px !important;
-        box-shadow: 0 10px 28px rgba(230, 26, 141, 0.12) !important;
+        padding: 24px 22px !important;
+        box-shadow: 0 10px 28px rgba(230, 26, 141, 0.10) !important;
     }
 
     /* Input Field Labels */
     label[data-testid="stWidgetLabel"] p {
-        font-size: 15px !important;
+        font-size: 14.5px !important;
         font-weight: 700 !important;
         color: #880E4F !important;
         margin-bottom: 4px !important;
     }
 
     /* Input Boxes */
-    .stTextInput input {
+    .stTextInput input, .stSelectbox div[data-baseweb="select"] {
         background-color: #FFF9FB !important;
-        border: 2px solid #F48FB1 !important;
-        border-radius: 10px !important;
+        border: 1.5px solid #F48FB1 !important;
+        border-radius: 8px !important;
         color: #0F172A !important;
-        font-size: 15px !important;
+        font-size: 14.5px !important;
         font-weight: 600 !important;
-        padding: 10px 14px !important;
-        transition: all 0.2s ease-in-out !important;
-    }
-    .stTextInput input:focus {
-        background-color: #FFFFFF !important;
-        border-color: #E61A8D !important;
-        box-shadow: 0 0 0 3px rgba(230, 26, 141, 0.25) !important;
     }
 
     /* Submit Button */
@@ -107,7 +90,7 @@ st.markdown("""
     /* Tabs Styling */
     button[data-baseweb="tab"] {
         font-weight: 700 !important;
-        font-size: 15px !important;
+        font-size: 14.5px !important;
         color: #64748B !important;
     }
     button[data-baseweb="tab"][aria-selected="true"] {
@@ -116,7 +99,6 @@ st.markdown("""
         font-weight: 800 !important;
     }
 
-    /* Portal Information Box */
     .portal-info-box {
         background: #FFFFFF;
         border-left: 5px solid #E61A8D;
@@ -124,9 +106,7 @@ st.markdown("""
         padding: 16px 20px;
         margin-top: 18px;
         box-shadow: 0 4px 16px rgba(230, 26, 141, 0.08);
-        border-top: 1px solid #FCE4EC;
-        border-right: 1px solid #FCE4EC;
-        border-bottom: 1px solid #FCE4EC;
+        border: 1px solid #FCE4EC;
     }
     .portal-info-box h4 {
         color: #AD1457 !important;
@@ -141,13 +121,11 @@ st.markdown("""
         margin: 0 !important;
     }
 
-    /* Sidebar Styling */
     section[data-testid="stSidebar"] {
         background-color: #FFF7FA !important;
         border-right: 1.5px solid #F8BBD0 !important;
     }
 
-    /* KPI Metrics Cards */
     div[data-testid="stMetric"] {
         background: #FFFFFF;
         border-left: 5px solid #E61A8D;
@@ -176,7 +154,7 @@ def render_top_poster():
     if banner_img_path:
         st.image(banner_img_path, use_container_width=True)
 
-# --- DATABASE SETUP ---
+# Database Setup
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -203,7 +181,7 @@ def init_db():
 
 init_db()
 
-# --- JURISDICTION HIERARCHY ---
+# Jurisdiction Data
 JURISDICTION_DATA = {
     "Khammam": {
         "Khammam Urban": ["Khammam (M Corp)", "Khanapuram Haveli", "Dhamsalapuram", "Mallemadugu"],
@@ -280,7 +258,7 @@ JURISDICTION_DATA = {
     }
 }
 
-# --- GOOGLE SHEETS CONNECTOR (LOCAL + CLOUD) ---
+# Google Sheets Connector
 def get_worksheet():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds = None
@@ -304,31 +282,76 @@ def get_worksheet():
     except Exception as e:
         return None, str(e)
 
-# --- PDF PARSING ENGINE ---
-def parse_acknowledgement_pdf(file_obj):
-    reader = PdfReader(file_obj)
-    text = ""
-    for page in reader.pages:
-        text += (page.extract_text() or "") + "\n"
+# Robust, Universal PDF Parsing Function
+def parse_acknowledgement_pdf(file_bytes):
+    try:
+        reader = PdfReader(io.BytesIO(file_bytes))
+        full_text = ""
+        for page in reader.pages:
+            extracted = page.extract_text()
+            if extracted:
+                full_text += extracted + "\n"
 
-    patterns = {
-        "application_id": r"Application\s*Id\s*[:\|\-]?\s*([A-Z0-9]+)",
-        "applicant_name": r"Applicant\s*Name\s*[:\|\-]?\s*([A-Za-z\s\.]+?)(?=\n|Gender|Relation|$)",
-        "gender": r"Gender\s*[:\|\-]?\s*([A-Za-z]+)",
-        "relation_name": r"Relation\s*Name\s*[:\|\-]?\s*([A-Za-z\s\.]+?)(?=\n|House|Gender|$)",
-        "house_number": r"House\s*Number\s*[:\|\-]?\s*([A-Za-z0-9\-\/\$\s]+?)(?=\n|Mlc|District|$)",
-        "mlc_constituency": r"(?:Mlc|Constituency)\s*Name\s*[:\|\-]?\s*([A-Za-z\-\s]+?)(?=\n|District|$)",
-        "district_name": r"District\s*Name\s*[:\|\-]?\s*([A-Za-z\s]+?)(?=\n|Current|Status|$)",
-        "current_status": r"Current\s*Status\s*[:\|\-]?\s*([A-Za-z0-9\s\.]+?)(?=\n|Print|Exit|$)"
-    }
+        # Normalize spaces and invisible unicode whitespace
+        normalized = re.sub(r'[\r\t\f\v]', ' ', full_text)
+        normalized = re.sub(r'[ \xa0]+', ' ', normalized)
 
-    parsed = {}
-    for key, regex in patterns.items():
-        match = re.search(regex, text, re.IGNORECASE)
-        val = match.group(1).strip() if match else ""
-        parsed[key] = val.replace("$", "").strip()
+        def search_value(regex_list):
+            for pattern in regex_list:
+                match = re.search(pattern, normalized, re.IGNORECASE)
+                if match:
+                    val = match.group(1).strip()
+                    val = val.replace("$", "").strip()
+                    if val:
+                        return val
+            return ""
 
-    return parsed
+        parsed = {}
+        parsed["application_id"] = search_value([
+            r"Application\s*(?:Id|ID|No|Number)?\s*[:\-\|]?\s*([A-Z0-9]{8,25})",
+            r"(F\d{10,20})",
+            r"App\s*Id\s*[:\-\|]?\s*([A-Z0-9]+)"
+        ])
+
+        parsed["applicant_name"] = search_value([
+            r"Applicant\s*Name\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*Gender|\s*Relation|\s*Father|\s*Husband|\n|$)",
+            r"Name\s*of\s*Applicant\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*Gender|\s*Relation|\n|$)",
+            r"Applicant\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*Gender|\n|$)"
+        ])
+
+        parsed["gender"] = search_value([
+            r"Gender\s*[:\-\|]?\s*([A-Za-z]+)",
+            r"\b(Male|Female|Transgender)\b"
+        ])
+
+        parsed["relation_name"] = search_value([
+            r"Relation\s*Name\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*House|\s*Gender|\s*Address|\n|$)",
+            r"(?:Father|Husband|Mother)\s*(?:Name)?\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*House|\n|$)"
+        ])
+
+        parsed["house_number"] = search_value([
+            r"House\s*Number\s*[:\-\|]?\s*([A-Za-z0-9\-\/\s]+?)(?=\s*Mlc|\s*District|\s*Constituency|\n|$)",
+            r"H\.?\s*No\.?\s*[:\-\|]?\s*([A-Za-z0-9\-\/\s]+?)(?=\s*Mlc|\s*District|\n|$)"
+        ])
+
+        parsed["mlc_constituency"] = search_value([
+            r"(?:Mlc|Constituency)\s*Name\s*[:\-\|]?\s*([A-Za-z\-\s]+?)(?=\s*District|\s*Status|\n|$)",
+            r"Constituency\s*[:\-\|]?\s*([A-Za-z\-\s]+?)(?=\s*District|\n|$)"
+        ])
+
+        parsed["district_name"] = search_value([
+            r"District\s*Name\s*[:\-\|]?\s*([A-Za-z\s]+?)(?=\s*Current|\s*Status|\s*Ack|\n|$)",
+            r"District\s*[:\-\|]?\s*([A-Za-z\s]+?)(?=\s*Current|\s*Status|\n|$)"
+        ])
+
+        parsed["current_status"] = search_value([
+            r"Current\s*Status\s*[:\-\|]?\s*([A-Za-z0-9\s\.]+?)(?=\s*Print|\s*Exit|\n|$)",
+            r"Status\s*[:\-\|]?\s*([A-Za-z0-9\s\.]+?)(?=\s*Print|\n|$)"
+        ])
+
+        return parsed
+    except Exception as e:
+        return {}
 
 def verify_user(username, password):
     pwd_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -360,18 +383,25 @@ def log_duplicate(app_id, name, operator):
     conn.commit()
     conn.close()
 
-# --- AUTH STATE ---
+# Session State Initialization
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = None
     st.session_state.role = None
     st.session_state.full_name = None
 
-# ==============================================================================
-# AUTH SCREEN: POSTER AT THE TOP, CRISP LOGIN CARD CENTERED BELOW
-# ==============================================================================
+# Input field session keys to guarantee multi-device updates
+form_fields = [
+    "field_app_id", "field_applicant_name", "field_gender",
+    "field_relation_name", "field_house_no", "field_constituency",
+    "field_ack_status", "field_ack_district", "last_uploaded_file_name"
+]
+for f in form_fields:
+    if f not in st.session_state:
+        st.session_state[f] = ""
+
+# Authentication Interface
 if not st.session_state.logged_in:
-    # Full poster rendered in its complete aspect ratio without distortion
     render_top_poster()
 
     _, col_form, _ = st.columns([1, 1.8, 1])
@@ -428,9 +458,7 @@ if not st.session_state.logged_in:
 
     st.stop()
 
-# ==============================================================================
-# AUTHENTICATED WORKSPACE
-# ==============================================================================
+# Authenticated Workspace
 with st.sidebar:
     st.markdown("""
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
@@ -478,17 +506,28 @@ with main_tab1:
 
     with upload_col:
         st.markdown("#### 1. Attach Form-18 PDF")
-        uploaded_pdf = st.file_uploader("Upload CEO Telangana Form-18 PDF", type=["pdf"])
+        uploaded_pdf = st.file_uploader("Upload CEO Telangana Form-18 PDF", type=["pdf"], key="form18_uploader")
 
-        extracted = {
-            "application_id": "", "applicant_name": "", "gender": "",
-            "relation_name": "", "house_number": "", "mlc_constituency": "",
-            "district_name": "", "current_status": ""
-        }
-
+        # Parse and sync to session state immediately upon upload
         if uploaded_pdf is not None:
-            extracted = parse_acknowledgement_pdf(uploaded_pdf)
-            st.success("✅ Form-18 Slip Extracted Successfully!")
+            if st.session_state["last_uploaded_file_name"] != uploaded_pdf.name:
+                pdf_bytes = uploaded_pdf.read()
+                parsed_data = parse_acknowledgement_pdf(pdf_bytes)
+
+                if parsed_data.get("application_id") or parsed_data.get("applicant_name"):
+                    st.session_state["field_app_id"] = parsed_data.get("application_id", "")
+                    st.session_state["field_applicant_name"] = parsed_data.get("applicant_name", "")
+                    st.session_state["field_gender"] = parsed_data.get("gender", "")
+                    st.session_state["field_relation_name"] = parsed_data.get("relation_name", "")
+                    st.session_state["field_house_no"] = parsed_data.get("house_number", "")
+                    st.session_state["field_constituency"] = parsed_data.get("mlc_constituency", "") or "Warangal-Khammam-Nalgonda"
+                    st.session_state["field_ack_status"] = parsed_data.get("current_status", "")
+                    st.session_state["field_ack_district"] = parsed_data.get("district_name", "")
+                    st.session_state["last_uploaded_file_name"] = uploaded_pdf.name
+                    st.rerun()
+
+        if st.session_state["field_app_id"]:
+            st.success(f"✅ Extracted: **{st.session_state['field_applicant_name']}** (`{st.session_state['field_app_id']}`)")
 
     with data_col:
         st.markdown("#### 2. Review & Tag Jurisdiction Details")
@@ -496,23 +535,30 @@ with main_tab1:
         with st.form("voter_entry_form"):
             st.markdown("##### 👤 Applicant Information")
             c1, c2 = st.columns(2)
-            app_id = c1.text_input("Application ID", value=extracted["application_id"])
-            name = c2.text_input("Applicant Name", value=extracted["applicant_name"])
+            app_id = c1.text_input("Application ID", value=st.session_state["field_app_id"])
+            name = c2.text_input("Applicant Name", value=st.session_state["field_applicant_name"])
 
             c3, c4, c5 = st.columns(3)
-            gender = c3.text_input("Gender", value=extracted["gender"])
-            relation = c4.text_input("Relation Name", value=extracted["relation_name"])
-            house_no = c5.text_input("House Number", value=extracted["house_number"])
+            gender = c3.text_input("Gender", value=st.session_state["field_gender"])
+            relation = c4.text_input("Relation Name", value=st.session_state["field_relation_name"])
+            house_no = c5.text_input("House Number", value=st.session_state["field_house_no"])
 
             c6, c7 = st.columns(2)
-            mlc_const = c6.text_input("Constituency", value=extracted["mlc_constituency"] or "Warangal-Khammam-Nalgonda")
-            status = c7.text_input("Status", value=extracted["current_status"])
+            mlc_const = c6.text_input("Constituency", value=st.session_state["field_constituency"] or "Warangal-Khammam-Nalgonda")
+            status = c7.text_input("Status", value=st.session_state["field_ack_status"])
 
             st.markdown("---")
             st.markdown("##### 📍 Tag Jurisdiction (MLC Limits)")
             
             all_districts = list(JURISDICTION_DATA.keys())
-            default_dist_idx = all_districts.index(extracted["district_name"]) if extracted["district_name"] in all_districts else 0
+            
+            # Select matching default district if detected
+            default_dist_idx = 0
+            detected_district = st.session_state["field_ack_district"].strip().title()
+            for idx, d_name in enumerate(all_districts):
+                if d_name.lower() in detected_district.lower() or detected_district.lower() in d_name.lower():
+                    default_dist_idx = idx
+                    break
 
             selected_district = st.selectbox("Select District", all_districts, index=default_dist_idx)
             available_mandals = list(JURISDICTION_DATA[selected_district].keys())
@@ -527,7 +573,7 @@ with main_tab1:
             r1, r2 = st.columns(2)
             ref_name = r1.text_input("Party Reference / Cadre Name", value="", placeholder="Enter Reference / Mandal Incharge Name")
             mobile_no = r2.text_input("Voter Mobile Number", placeholder="10-digit number")
-            remarks = st.text_area("Remarks / Notes", placeholder="e.g., Degree Certificate verified, BRS party supporter")
+            remarks = st.text_area("Remarks / Notes", placeholder="e.g., Degree Certificate verified, BRS supporter")
 
             save_btn = st.form_submit_button("🚗 Save & Submit to BRS Voter Database", use_container_width=True)
 
@@ -547,17 +593,21 @@ with main_tab1:
 
                             if app_id in existing_ids:
                                 log_duplicate(app_id, name, st.session_state.username)
-                                st.warning(f"⚠️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
+                                st.warning(f"⚠️️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
                             else:
                                 new_entry = [
                                     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                     app_id, name, gender, relation, house_no,
-                                    mlc_const, extracted["district_name"], status,
+                                    mlc_const, st.session_state["field_ack_district"], status,
                                     selected_district, selected_mandal, final_village,
                                     ref_name, mobile_no, remarks, st.session_state.username
                                 ]
                                 ws.append_row(new_entry)
                                 st.success(f"🎉 Successfully Ingested: {name} ({app_id}) to BRS Central Records!")
+                                
+                                # Clear session fields for subsequent slip entry
+                                for f in form_fields:
+                                    st.session_state[f] = ""
                         except Exception as ex:
                             st.error(f"Error appending row: {ex}")
 
