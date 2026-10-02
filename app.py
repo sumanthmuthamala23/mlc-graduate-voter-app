@@ -14,6 +14,13 @@ import base64
 import requests
 from datetime import datetime
 
+# Optional local OCR engine fallback
+try:
+    import pytesseract
+    HAS_PYTESSERACT = True
+except ImportError:
+    HAS_PYTESSERACT = False
+
 st.set_page_config(
     page_title="BRS | Warangal-Khammam-Nalgonda MLC Console",
     page_icon="🚗",
@@ -30,7 +37,7 @@ def get_banner_image():
 
 banner_img_path = get_banner_image()
 
-# BRS & Google Lens Custom CSS
+# BRS Styling
 st.markdown("""
 <style>
     .stApp {
@@ -44,7 +51,6 @@ st.markdown("""
         padding-bottom: 2.5rem;
     }
 
-    /* Google Lens Scanner Card */
     .lens-header-card {
         background: linear-gradient(135deg, #FFFFFF 0%, #FFF5F9 100%);
         border: 2px solid #F48FB1;
@@ -78,7 +84,6 @@ st.markdown("""
         margin: 2px 0 0 0;
     }
 
-    /* Card Forms */
     [data-testid="stForm"] {
         background: #FFFFFF !important;
         border: 2px solid #F8BBD0 !important;
@@ -316,7 +321,7 @@ def get_worksheet():
     except Exception as e:
         return None, str(e)
 
-# Multi-Key Rotation Pool Retriever
+# Multi-Key Rotation Pool
 def get_configured_api_keys():
     keys = []
     if st.session_state.get("custom_gemini_key", "").strip():
@@ -349,7 +354,7 @@ def get_configured_api_keys():
             deduped.append(k)
     return deduped
 
-# Image Enhancement Engine for Mobile Photos & Screenshots
+# Image Enhancement Engine
 def enhance_image_for_ocr(image_bytes):
     try:
         img = Image.open(io.BytesIO(image_bytes))
@@ -370,6 +375,63 @@ def enhance_image_for_ocr(image_bytes):
     except Exception:
         return image_bytes, "image/jpeg"
 
+# Text Parsing Rules
+def extract_fields_from_raw_text(text):
+    normalized = re.sub(r'[\r\t\f\v]', ' ', text)
+    normalized = re.sub(r'[ \xa0]+', ' ', normalized)
+
+    def search_value(regex_list):
+        for pattern in regex_list:
+            match = re.search(pattern, normalized, re.IGNORECASE)
+            if match:
+                val = match.group(1).strip().replace("$", "").strip()
+                if val:
+                    return val
+        return ""
+
+    parsed = {}
+    parsed["application_id"] = search_value([
+        r"Application\s*(?:Id|ID|No|Number)?\s*[:\-\|]?\s*([A-Z0-9]{8,25})",
+        r"\b(F\d{10,20})\b",
+        r"App\s*Id\s*[:\-\|]?\s*([A-Z0-9]+)"
+    ])
+    parsed["applicant_name"] = search_value([
+        r"Applicant\s*Name\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*Gender|\s*Relation|\s*Father|\s*Husband|\n|$)",
+        r"Name\s*of\s*Applicant\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*Gender|\s*Relation|\n|$)",
+        r"Applicant\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*Gender|\n|$)"
+    ])
+    parsed["gender"] = search_value([
+        r"Gender\s*[:\-\|]?\s*([A-Za-z]+)",
+        r"\b(Male|Female|Transgender)\b"
+    ])
+    parsed["relation_name"] = search_value([
+        r"Relation\s*Name\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*House|\s*Gender|\s*Address|\n|$)",
+        r"(?:Father|Husband|Mother)\s*(?:Name)?\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*House|\n|$)"
+    ])
+    parsed["house_number"] = search_value([
+        r"House\s*Number\s*[:\-\|]?\s*([A-Za-z0-9\-\/\s]+?)(?=\s*Mlc|\s*District|\s*Constituency|\n|$)",
+        r"H\.?\s*No\.?\s*[:\-\|]?\s*([A-Za-z0-9\-\/\s]+?)(?=\s*Mlc|\s*District|\n|$)"
+    ])
+    parsed["mlc_constituency"] = search_value([
+        r"(?:Mlc|Constituency)\s*Name\s*[:\-\|]?\s*([A-Za-z\-\s]+?)(?=\s*District|\s*Status|\n|$)",
+        r"Constituency\s*[:\-\|]?\s*([A-Za-z\-\s]+?)(?=\s*District|\n|$)"
+    ])
+    parsed["district_name"] = search_value([
+        r"District\s*Name\s*[:\-\|]?\s*([A-Za-z\s]+?)(?=\s*Current|\s*Status|\s*Ack|\n|$)",
+        r"District\s*[:\-\|]?\s*([A-Za-z\s]+?)(?=\s*Current|\s*Status|\n|$)"
+    ])
+
+    status_match = search_value([
+        r"Current\s*Status\s*[:\-\|]?\s*(Submitted|Pending|Approved|Rejected|Verified|In\s*Process)",
+        r"Status\s*[:\-\|]?\s*(Submitted|Pending|Approved|Rejected|Verified|In\s*Process)",
+        r"\b(Submitted|Pending|Approved|Rejected|Verified)\b"
+    ])
+    if not status_match or "application" in status_match.lower() or "f18" in status_match.lower():
+        status_match = "Submitted"
+
+    parsed["current_status"] = status_match
+    return parsed
+
 # Engine 1: Pure Offline PDF Text Extraction
 def parse_acknowledgement_pdf(file_bytes):
     try:
@@ -383,64 +445,12 @@ def parse_acknowledgement_pdf(file_bytes):
         if len(full_text.strip()) < 15:
             return {}, ""
 
-        normalized = re.sub(r'[\r\t\f\v]', ' ', full_text)
-        normalized = re.sub(r'[ \xa0]+', ' ', normalized)
-
-        def search_value(regex_list):
-            for pattern in regex_list:
-                match = re.search(pattern, normalized, re.IGNORECASE)
-                if match:
-                    val = match.group(1).strip().replace("$", "").strip()
-                    if val:
-                        return val
-            return ""
-
-        parsed = {}
-        parsed["application_id"] = search_value([
-            r"Application\s*(?:Id|ID|No|Number)?\s*[:\-\|]?\s*([A-Z0-9]{8,25})",
-            r"\b(F\d{10,20})\b",
-            r"App\s*Id\s*[:\-\|]?\s*([A-Z0-9]+)"
-        ])
-        parsed["applicant_name"] = search_value([
-            r"Applicant\s*Name\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*Gender|\s*Relation|\s*Father|\s*Husband|\n|$)",
-            r"Name\s*of\s*Applicant\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*Gender|\s*Relation|\n|$)",
-            r"Applicant\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*Gender|\n|$)"
-        ])
-        parsed["gender"] = search_value([
-            r"Gender\s*[:\-\|]?\s*([A-Za-z]+)",
-            r"\b(Male|Female|Transgender)\b"
-        ])
-        parsed["relation_name"] = search_value([
-            r"Relation\s*Name\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*House|\s*Gender|\s*Address|\n|$)",
-            r"(?:Father|Husband|Mother)\s*(?:Name)?\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*House|\n|$)"
-        ])
-        parsed["house_number"] = search_value([
-            r"House\s*Number\s*[:\-\|]?\s*([A-Za-z0-9\-\/\s]+?)(?=\s*Mlc|\s*District|\s*Constituency|\n|$)",
-            r"H\.?\s*No\.?\s*[:\-\|]?\s*([A-Za-z0-9\-\/\s]+?)(?=\s*Mlc|\s*District|\n|$)"
-        ])
-        parsed["mlc_constituency"] = search_value([
-            r"(?:Mlc|Constituency)\s*Name\s*[:\-\|]?\s*([A-Za-z\-\s]+?)(?=\s*District|\s*Status|\n|$)",
-            r"Constituency\s*[:\-\|]?\s*([A-Za-z\-\s]+?)(?=\s*District|\n|$)"
-        ])
-        parsed["district_name"] = search_value([
-            r"District\s*Name\s*[:\-\|]?\s*([A-Za-z\s]+?)(?=\s*Current|\s*Status|\s*Ack|\n|$)",
-            r"District\s*[:\-\|]?\s*([A-Za-z\s]+?)(?=\s*Current|\s*Status|\n|$)"
-        ])
-
-        status_match = search_value([
-            r"Current\s*Status\s*[:\-\|]?\s*(Submitted|Pending|Approved|Rejected|Verified|In\s*Process)",
-            r"Status\s*[:\-\|]?\s*(Submitted|Pending|Approved|Rejected|Verified|In\s*Process)",
-            r"\b(Submitted|Pending|Approved|Rejected|Verified)\b"
-        ])
-        if not status_match or "application" in status_match.lower() or "f18" in status_match.lower():
-            status_match = "Submitted"
-
-        parsed["current_status"] = status_match
-        return parsed, normalized
+        parsed = extract_fields_from_raw_text(full_text)
+        return parsed, full_text
     except Exception:
         return {}, ""
 
-# Clean JSON string robustly without unescaped line-break issues
+# Clean JSON parser
 def clean_and_parse_json(text_content):
     txt = text_content.strip()
     if txt.startswith("```"):
@@ -454,24 +464,24 @@ def clean_and_parse_json(text_content):
         return json.loads(match.group(1))
     return json.loads(txt)
 
-# Engine 2: Google Lens Multi-Key Vision Model
+# Engine 2: Google Lens AI Vision
 def parse_with_google_lens(file_bytes, mime_type, api_keys):
     if not api_keys:
-        return {}, ""
+        return {}, "", "No API Keys Configured"
 
     b64_data = base64.b64encode(file_bytes).decode('utf-8')
     prompt_text = """You are an expert Google Lens OCR system scanning a CEO Telangana Form-18 Acknowledgement Slip / Graduate Voter Slip.
-Even if the image is blurry, low contrast, cropped, or slightly tilted:
-1. Locate the 'Application Id' (starts with 'F' followed by 10-15 digits, like F180928310521426).
-2. Locate 'Applicant Name' (in English capital letters).
-3. Locate 'Gender' (Male / Female).
-4. Locate 'Relation Name' (Father / Husband name).
-5. Locate 'House Number' (e.g. 7-3-410/6).
-6. Locate 'Mlc Name' / 'Constituency' (e.g. Warangal-Khammam-Nalgonda).
-7. Locate 'District Name' (e.g. Khammam, Nalgonda, Warangal, Suryapet).
-8. Status is strictly 'Submitted'. Do NOT copy the Application ID into status.
+Locate and extract:
+1. Application Id (starts with 'F' followed by digits, like F180928310521426)
+2. Applicant Name
+3. Gender
+4. Relation Name
+5. House Number
+6. Mlc Name / Constituency
+7. District Name
+8. Status is strictly 'Submitted'.
 
-Return ONLY a valid JSON object matching this schema:
+Return ONLY a valid JSON object matching:
 {
   "application_id": "...",
   "applicant_name": "...",
@@ -495,8 +505,14 @@ Return ONLY a valid JSON object matching this schema:
     }
 
     models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    last_err = ""
 
     for key in api_keys:
+        # Validate key format
+        if not key.startswith("AIzaSy"):
+            last_err = f"Key '{key[:8]}...' does not start with 'AIzaSy'. Please use an API Key from Google AI Studio."
+            continue
+
         for model in models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
             try:
@@ -511,37 +527,56 @@ Return ONLY a valid JSON object matching this schema:
                         data["current_status"] = "Submitted"
 
                     ocr_raw = data.pop("ocr_full_text", "")
-                    return data, ocr_raw
-                elif res.status_code in [429, 401, 403]:
-                    break
-            except Exception:
+                    return data, ocr_raw, "OK"
+                else:
+                    last_err = f"Google API Error {res.status_code}: {res.text[:120]}"
+                    if res.status_code in [400, 401, 403]:
+                        break
+            except Exception as e:
+                last_err = str(e)
                 continue
 
-    return {}, ""
+    return {}, "", last_err
 
-# Universal Multi-Device Router with Auto-Enhancement
+# Engine 3: Local Offline Tesseract OCR Fallback
+def parse_with_offline_ocr(file_bytes):
+    if not HAS_PYTESSERACT:
+        return {}, "", "Pytesseract Not Installed"
+    try:
+        img = Image.open(io.BytesIO(file_bytes))
+        raw_text = pytesseract.image_to_string(img)
+        if len(raw_text.strip()) > 15:
+            data = extract_fields_from_raw_text(raw_text)
+            if data.get("application_id") or data.get("applicant_name"):
+                return data, raw_text, "OK"
+        return {}, raw_text, "No Text Found"
+    except Exception as ex:
+        return {}, "", str(ex)
+
+# Universal Router
 def extract_universal_document(uploaded_file, file_bytes, api_keys):
     filename = uploaded_file.name.lower() if hasattr(uploaded_file, 'name') else "image.jpg"
 
+    # 1. Standard Digital PDF
     if filename.endswith(".pdf"):
         data, raw_txt = parse_acknowledgement_pdf(file_bytes)
         if data.get("application_id") or data.get("applicant_name"):
-            return data, raw_txt, "PDF Text Engine"
+            return data, raw_txt, "PDF Text Engine", ""
 
+    # 2. Enhance image
     enhanced_bytes, mime_type = enhance_image_for_ocr(file_bytes)
 
-    if api_keys:
-        lens_data, raw_txt = parse_with_google_lens(enhanced_bytes, mime_type, api_keys)
-        if lens_data.get("application_id") or lens_data.get("applicant_name"):
-            return lens_data, raw_txt, "Google Lens AI (Enhanced)"
-        
-        lens_data2, raw_txt2 = parse_with_google_lens(file_bytes, "image/jpeg", api_keys)
-        if lens_data2.get("application_id") or lens_data2.get("applicant_name"):
-            return lens_data2, raw_txt2, "Google Lens AI Module"
+    # 3. Try Google Lens AI Vision
+    lens_data, raw_txt, err_detail = parse_with_google_lens(enhanced_bytes, mime_type, api_keys)
+    if lens_data.get("application_id") or lens_data.get("applicant_name"):
+        return lens_data, raw_txt, "Google Lens AI (Enhanced)", ""
 
-        return {}, "", "Vision Error"
+    # 4. Offline Tesseract OCR Fallback (Works with no API key)
+    tess_data, tess_txt, tess_err = parse_with_offline_ocr(enhanced_bytes)
+    if tess_data.get("application_id") or tess_data.get("applicant_name"):
+        return tess_data, tess_txt, "Offline Tesseract OCR", ""
 
-    return {}, "", "Needs API Key"
+    return {}, "", "Failed", err_detail
 
 def verify_user(username, password):
     pwd_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -640,7 +675,7 @@ if not st.session_state.logged_in:
             <p><strong>Warangal – Khammam – Nalgonda Graduate MLC Constituency</strong></p>
             <p style="margin-top: 6px; color: #475569;">
                 🔍 <strong>Enhanced Google Lens Scanner:</strong><br>
-                Upload any mobile screenshot, WhatsApp photo, or physical paper slip. Unclear and blurry images are automatically enhanced to extract voter acknowledgement details into the system.
+                Upload any mobile screenshot, WhatsApp photo, or physical paper slip to instantly extract voter details.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -659,14 +694,15 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     st.markdown(f"**Operator:** {st.session_state.full_name}")
     st.markdown(f"**Role:** `{st.session_state.role}`")
-    st.caption(f"🔑 Active OCR Engines Loaded: **{len(configured_keys)} Keys**")
+    st.caption(f"🔑 Active Keys Configured: **{len(configured_keys)}**")
     if st.button("Log Out", use_container_width=True):
         st.session_state.logged_in = False
         st.rerun()
     st.divider()
 
-    with st.expander("⚙️ Backup API Key"):
-        custom_k = st.text_input("Temporary Backup Key", type="password", value=st.session_state.get("custom_gemini_key", ""))
+    with st.expander("⚙️ Gemini API Key (For Google Lens)"):
+        st.caption("Keys must start with `AIzaSy...` from Google AI Studio.")
+        custom_k = st.text_input("Add Google AI Studio Key", type="password", value=st.session_state.get("custom_gemini_key", ""))
         if custom_k:
             st.session_state["custom_gemini_key"] = custom_k
             configured_keys = get_configured_api_keys()
@@ -736,8 +772,8 @@ with main_tab1:
             current_hash = hashlib.md5(target_bytes).hexdigest()
 
             if st.session_state["last_file_hash"] != current_hash:
-                with st.spinner("🔍 Enhancing image & scanning text with Google Lens..."):
-                    extracted_info, raw_ocr, engine_used = extract_universal_document(target_file_obj, target_bytes, configured_keys)
+                with st.spinner("🔍 Scanning & extracting voter slip..."):
+                    extracted_info, raw_ocr, engine_used, err_detail = extract_universal_document(target_file_obj, target_bytes, configured_keys)
 
                     if extracted_info.get("application_id") or extracted_info.get("applicant_name"):
                         st.session_state["field_app_id"] = extracted_info.get("application_id", "")
@@ -752,10 +788,10 @@ with main_tab1:
                         st.session_state["last_file_hash"] = current_hash
                         st.session_state["last_engine"] = engine_used
                         st.rerun()
-                    elif engine_used == "Needs API Key":
-                        st.warning("📸 Please configure GEMINI_API_KEYS in Streamlit Secrets.")
                     else:
-                        st.error("Could not parse text. Ensure the screenshot is clear or enter the details manually.")
+                        st.error(f"Could not parse image. {err_detail}")
+                        if "AIzaSy" in err_detail:
+                            st.info("💡 To get a real Gemini API Key, visit https://aistudio.google.com/apikey (it takes 10 seconds and starts with `AIzaSy`).")
 
         if st.session_state["field_app_id"]:
             engine_label = st.session_state.get("last_engine", "Extracted")
