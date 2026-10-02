@@ -8,6 +8,9 @@ import hashlib
 import re
 import os
 import io
+import json
+import base64
+import requests
 from datetime import datetime
 
 st.set_page_config(
@@ -26,7 +29,7 @@ def get_banner_image():
 
 banner_img_path = get_banner_image()
 
-# Clean BRS Styling
+# BRS Styling
 st.markdown("""
 <style>
     .stApp {
@@ -40,7 +43,6 @@ st.markdown("""
         padding-bottom: 2.5rem;
     }
 
-    /* Card Forms */
     [data-testid="stForm"] {
         background: #FFFFFF !important;
         border: 2px solid #F8BBD0 !important;
@@ -49,7 +51,6 @@ st.markdown("""
         box-shadow: 0 10px 28px rgba(230, 26, 141, 0.10) !important;
     }
 
-    /* Input Field Labels */
     label[data-testid="stWidgetLabel"] p {
         font-size: 14.5px !important;
         font-weight: 700 !important;
@@ -57,7 +58,6 @@ st.markdown("""
         margin-bottom: 4px !important;
     }
 
-    /* Input Boxes */
     .stTextInput input, .stSelectbox div[data-baseweb="select"] {
         background-color: #FFF9FB !important;
         border: 1.5px solid #F48FB1 !important;
@@ -67,7 +67,6 @@ st.markdown("""
         font-weight: 600 !important;
     }
 
-    /* Submit Button */
     div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {
         background: linear-gradient(90deg, #E61A8D 0%, #D81B60 100%) !important;
         color: #FFFFFF !important;
@@ -87,7 +86,6 @@ st.markdown("""
         transform: translateY(-2px);
     }
 
-    /* Tabs Styling */
     button[data-baseweb="tab"] {
         font-weight: 700 !important;
         font-size: 14.5px !important;
@@ -181,7 +179,7 @@ def init_db():
 
 init_db()
 
-# Jurisdiction Data
+# Jurisdiction Hierarchy
 JURISDICTION_DATA = {
     "Khammam": {
         "Khammam Urban": ["Khammam (M Corp)", "Khanapuram Haveli", "Dhamsalapuram", "Mallemadugu"],
@@ -282,7 +280,17 @@ def get_worksheet():
     except Exception as e:
         return None, str(e)
 
-# Robust, Universal PDF Parsing Function
+# API Key Finder
+def get_gemini_key():
+    if "GEMINI_API_KEY" in st.secrets:
+        return st.secrets["GEMINI_API_KEY"]
+    if "gemini_api_key" in st.secrets:
+        return st.secrets["gemini_api_key"]
+    if os.environ.get("GEMINI_API_KEY"):
+        return os.environ.get("GEMINI_API_KEY")
+    return st.session_state.get("custom_gemini_key", "")
+
+# Engine 1: Pure Offline PDF Text Extraction
 def parse_acknowledgement_pdf(file_bytes):
     try:
         reader = PdfReader(io.BytesIO(file_bytes))
@@ -292,7 +300,9 @@ def parse_acknowledgement_pdf(file_bytes):
             if extracted:
                 full_text += extracted + "\n"
 
-        # Normalize spaces and invisible unicode whitespace
+        if len(full_text.strip()) < 15:
+            return {}
+
         normalized = re.sub(r'[\r\t\f\v]', ' ', full_text)
         normalized = re.sub(r'[ \xa0]+', ' ', normalized)
 
@@ -300,8 +310,7 @@ def parse_acknowledgement_pdf(file_bytes):
             for pattern in regex_list:
                 match = re.search(pattern, normalized, re.IGNORECASE)
                 if match:
-                    val = match.group(1).strip()
-                    val = val.replace("$", "").strip()
+                    val = match.group(1).strip().replace("$", "").strip()
                     if val:
                         return val
             return ""
@@ -309,49 +318,109 @@ def parse_acknowledgement_pdf(file_bytes):
         parsed = {}
         parsed["application_id"] = search_value([
             r"Application\s*(?:Id|ID|No|Number)?\s*[:\-\|]?\s*([A-Z0-9]{8,25})",
-            r"(F\d{10,20})",
+            r"\b(F\d{10,20})\b",
             r"App\s*Id\s*[:\-\|]?\s*([A-Z0-9]+)"
         ])
-
         parsed["applicant_name"] = search_value([
             r"Applicant\s*Name\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*Gender|\s*Relation|\s*Father|\s*Husband|\n|$)",
             r"Name\s*of\s*Applicant\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*Gender|\s*Relation|\n|$)",
             r"Applicant\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*Gender|\n|$)"
         ])
-
         parsed["gender"] = search_value([
             r"Gender\s*[:\-\|]?\s*([A-Za-z]+)",
             r"\b(Male|Female|Transgender)\b"
         ])
-
         parsed["relation_name"] = search_value([
             r"Relation\s*Name\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*House|\s*Gender|\s*Address|\n|$)",
             r"(?:Father|Husband|Mother)\s*(?:Name)?\s*[:\-\|]?\s*([A-Za-z\s\.]+?)(?=\s*House|\n|$)"
         ])
-
         parsed["house_number"] = search_value([
             r"House\s*Number\s*[:\-\|]?\s*([A-Za-z0-9\-\/\s]+?)(?=\s*Mlc|\s*District|\s*Constituency|\n|$)",
             r"H\.?\s*No\.?\s*[:\-\|]?\s*([A-Za-z0-9\-\/\s]+?)(?=\s*Mlc|\s*District|\n|$)"
         ])
-
         parsed["mlc_constituency"] = search_value([
             r"(?:Mlc|Constituency)\s*Name\s*[:\-\|]?\s*([A-Za-z\-\s]+?)(?=\s*District|\s*Status|\n|$)",
             r"Constituency\s*[:\-\|]?\s*([A-Za-z\-\s]+?)(?=\s*District|\n|$)"
         ])
-
         parsed["district_name"] = search_value([
             r"District\s*Name\s*[:\-\|]?\s*([A-Za-z\s]+?)(?=\s*Current|\s*Status|\s*Ack|\n|$)",
             r"District\s*[:\-\|]?\s*([A-Za-z\s]+?)(?=\s*Current|\s*Status|\n|$)"
         ])
-
         parsed["current_status"] = search_value([
             r"Current\s*Status\s*[:\-\|]?\s*([A-Za-z0-9\s\.]+?)(?=\s*Print|\s*Exit|\n|$)",
             r"Status\s*[:\-\|]?\s*([A-Za-z0-9\s\.]+?)(?=\s*Print|\n|$)"
         ])
-
         return parsed
-    except Exception as e:
+    except Exception:
         return {}
+
+# Engine 2: AI Multimodal Vision (For JPG, PNG, WEBP & Scanned PDF Slips)
+def parse_with_vision(file_bytes, mime_type, api_key):
+    models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    b64_data = base64.b64encode(file_bytes).decode('utf-8')
+
+    prompt_text = """Analyze this Form-18 acknowledgement receipt/voter slip image and extract these exact fields as JSON:
+{
+  "application_id": "Application ID or slip number (e.g., F180928310521426)",
+  "applicant_name": "Applicant Name",
+  "gender": "Male or Female",
+  "relation_name": "Father or Husband or Relation Name",
+  "house_number": "House Number",
+  "mlc_constituency": "Constituency Name (e.g. Warangal-Khammam-Nalgonda)",
+  "district_name": "District Name",
+  "current_status": "Status if visible"
+}
+Return raw JSON only."""
+
+    payload = {
+        "contents": [{
+            "parts": [
+                {"inline_data": {"mime_type": mime_type, "data": b64_data}},
+                {"text": prompt_text}
+            ]
+        }],
+        "generationConfig": {"response_mime_type": "application/json"}
+    }
+
+    for model in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        try:
+            res = requests.post(url, json=payload, timeout=25)
+            if res.status_code == 200:
+                body = res.json()
+                text_content = body["candidates"][0]["content"]["parts"][0]["text"]
+                return json.loads(text_content)
+        except Exception:
+            continue
+    return {}
+
+# Universal Router: Handles PDF, JPG, JPEG, PNG, WEBP
+def extract_universal_document(uploaded_file, api_key):
+    filename = uploaded_file.name.lower()
+    file_bytes = uploaded_file.getvalue()
+
+    # Step 1: If it's a PDF, test offline digital text extraction first
+    if filename.endswith(".pdf"):
+        data = parse_acknowledgement_pdf(file_bytes)
+        if data.get("application_id") or data.get("applicant_name"):
+            return data, "Offline PDF Engine"
+
+    # Step 2: If file is an image (JPG/PNG/WEBP) or scanned PDF, use Vision Engine
+    mime_type = "application/pdf"
+    if filename.endswith((".jpg", ".jpeg")):
+        mime_type = "image/jpeg"
+    elif filename.endswith(".png"):
+        mime_type = "image/png"
+    elif filename.endswith(".webp"):
+        mime_type = "image/webp"
+
+    if api_key:
+        vision_data = parse_with_vision(file_bytes, mime_type, api_key)
+        if vision_data.get("application_id") or vision_data.get("applicant_name"):
+            return vision_data, "AI Vision Engine"
+        return {}, "Vision Error"
+
+    return {}, "Needs API Key"
 
 def verify_user(username, password):
     pwd_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -390,17 +459,16 @@ if "logged_in" not in st.session_state:
     st.session_state.role = None
     st.session_state.full_name = None
 
-# Input field session keys to guarantee multi-device updates
 form_fields = [
     "field_app_id", "field_applicant_name", "field_gender",
     "field_relation_name", "field_house_no", "field_constituency",
-    "field_ack_status", "field_ack_district", "last_uploaded_file_name"
+    "field_ack_status", "field_ack_district", "last_file_hash"
 ]
 for f in form_fields:
     if f not in st.session_state:
         st.session_state[f] = ""
 
-# Authentication Interface
+# Login Screen
 if not st.session_state.logged_in:
     render_top_poster()
 
@@ -450,15 +518,17 @@ if not st.session_state.logged_in:
             <h4>🌸 భారత రాష్ట్ర సమితి (BRS) — War Room Console</h4>
             <p><strong>Warangal – Khammam – Nalgonda Graduate MLC Constituency</strong></p>
             <p style="margin-top: 6px; color: #475569;">
-                📌 <strong>Central Voter Consolidation Desk:</strong><br>
-                Authorized operators and volunteers can upload Form-18 slips to verify duplicates and sync voter records directly with Google Sheets.
+                📌 <strong>Multi-Device Voter Intake:</strong><br>
+                Accepts original Form-18 PDFs, mobile camera photos, screenshots, and scans across any smartphone or desktop.
             </p>
         </div>
         """, unsafe_allow_html=True)
 
     st.stop()
 
-# Authenticated Workspace
+# Workspace
+active_api_key = get_gemini_key()
+
 with st.sidebar:
     st.markdown("""
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
@@ -472,6 +542,12 @@ with st.sidebar:
         st.session_state.logged_in = False
         st.rerun()
     st.divider()
+
+    with st.expander("⚙️ Photo / Image Scanner Settings"):
+        custom_k = st.text_input("Gemini API Key (Optional)", type="password", value=st.session_state.get("custom_gemini_key", ""), help="Digital PDFs extract 100% automatically without any key. Only required for phone camera snaps or JPG/PNG files.")
+        if custom_k:
+            st.session_state["custom_gemini_key"] = custom_k
+            active_api_key = custom_k
 
     if st.session_state.role == "Admin":
         st.subheader("👥 Volunteer Approvals")
@@ -505,29 +581,42 @@ with main_tab1:
     upload_col, data_col = st.columns([1, 1.25], gap="large")
 
     with upload_col:
-        st.markdown("#### 1. Attach Form-18 PDF")
-        uploaded_pdf = st.file_uploader("Upload CEO Telangana Form-18 PDF", type=["pdf"], key="form18_uploader")
+        st.markdown("#### 1. Attach Form-18 Slip (PDF / JPG / PNG)")
+        uploaded_doc = st.file_uploader(
+            "Upload Form-18 PDF, Camera Photo, or Screenshot",
+            type=["pdf", "png", "jpg", "jpeg", "webp"],
+            key="form18_universal_uploader"
+        )
 
-        # Parse and sync to session state immediately upon upload
-        if uploaded_pdf is not None:
-            if st.session_state["last_uploaded_file_name"] != uploaded_pdf.name:
-                pdf_bytes = uploaded_pdf.read()
-                parsed_data = parse_acknowledgement_pdf(pdf_bytes)
+        if uploaded_doc is not None:
+            current_bytes = uploaded_doc.getvalue()
+            current_hash = hashlib.md5(current_bytes).hexdigest()
 
-                if parsed_data.get("application_id") or parsed_data.get("applicant_name"):
-                    st.session_state["field_app_id"] = parsed_data.get("application_id", "")
-                    st.session_state["field_applicant_name"] = parsed_data.get("applicant_name", "")
-                    st.session_state["field_gender"] = parsed_data.get("gender", "")
-                    st.session_state["field_relation_name"] = parsed_data.get("relation_name", "")
-                    st.session_state["field_house_no"] = parsed_data.get("house_number", "")
-                    st.session_state["field_constituency"] = parsed_data.get("mlc_constituency", "") or "Warangal-Khammam-Nalgonda"
-                    st.session_state["field_ack_status"] = parsed_data.get("current_status", "")
-                    st.session_state["field_ack_district"] = parsed_data.get("district_name", "")
-                    st.session_state["last_uploaded_file_name"] = uploaded_pdf.name
-                    st.rerun()
+            # Hash-based change detection guarantees every file triggers extraction
+            if st.session_state["last_file_hash"] != current_hash:
+                with st.spinner("⚡ Extracting voter details from document..."):
+                    extracted_info, engine_used = extract_universal_document(uploaded_doc, active_api_key)
+
+                    if extracted_info.get("application_id") or extracted_info.get("applicant_name"):
+                        st.session_state["field_app_id"] = extracted_info.get("application_id", "")
+                        st.session_state["field_applicant_name"] = extracted_info.get("applicant_name", "")
+                        st.session_state["field_gender"] = extracted_info.get("gender", "")
+                        st.session_state["field_relation_name"] = extracted_info.get("relation_name", "")
+                        st.session_state["field_house_no"] = extracted_info.get("house_number", "")
+                        st.session_state["field_constituency"] = extracted_info.get("mlc_constituency", "") or "Warangal-Khammam-Nalgonda"
+                        st.session_state["field_ack_status"] = extracted_info.get("current_status", "")
+                        st.session_state["field_ack_district"] = extracted_info.get("district_name", "")
+                        st.session_state["last_file_hash"] = current_hash
+                        st.session_state["last_engine"] = engine_used
+                        st.rerun()
+                    elif engine_used == "Needs API Key":
+                        st.warning("📸 For photo/camera images (JPG/PNG), please add a free Gemini API Key in the left sidebar or upload the original digital PDF.")
+                    else:
+                        st.error("Could not automatically parse text. Please ensure the document is clear or enter the details manually.")
 
         if st.session_state["field_app_id"]:
-            st.success(f"✅ Extracted: **{st.session_state['field_applicant_name']}** (`{st.session_state['field_app_id']}`)")
+            engine_label = st.session_state.get("last_engine", "Extracted")
+            st.success(f"✅ {engine_label}: **{st.session_state['field_applicant_name']}** (`{st.session_state['field_app_id']}`)")
 
     with data_col:
         st.markdown("#### 2. Review & Tag Jurisdiction Details")
@@ -552,11 +641,10 @@ with main_tab1:
             
             all_districts = list(JURISDICTION_DATA.keys())
             
-            # Select matching default district if detected
             default_dist_idx = 0
-            detected_district = st.session_state["field_ack_district"].strip().title()
+            detected_district = st.session_state["field_ack_district"].strip().lower()
             for idx, d_name in enumerate(all_districts):
-                if d_name.lower() in detected_district.lower() or detected_district.lower() in d_name.lower():
+                if d_name.lower() in detected_district or detected_district in d_name.lower():
                     default_dist_idx = idx
                     break
 
@@ -593,7 +681,7 @@ with main_tab1:
 
                             if app_id in existing_ids:
                                 log_duplicate(app_id, name, st.session_state.username)
-                                st.warning(f"⚠️️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
+                                st.warning(f"⚠️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
                             else:
                                 new_entry = [
                                     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -605,7 +693,6 @@ with main_tab1:
                                 ws.append_row(new_entry)
                                 st.success(f"🎉 Successfully Ingested: {name} ({app_id}) to BRS Central Records!")
                                 
-                                # Clear session fields for subsequent slip entry
                                 for f in form_fields:
                                     st.session_state[f] = ""
                         except Exception as ex:
