@@ -283,11 +283,9 @@ def get_worksheet():
 # Multi-Key Rotation Pool Retriever
 def get_configured_api_keys():
     keys = []
-    # 1. Manual user override from session
     if st.session_state.get("custom_gemini_key", "").strip():
         keys.append(st.session_state["custom_gemini_key"].strip())
 
-    # 2. Streamlit Cloud Secrets (List or String)
     try:
         if "GEMINI_API_KEYS" in st.secrets:
             val = st.secrets["GEMINI_API_KEYS"]
@@ -303,12 +301,10 @@ def get_configured_api_keys():
     except Exception:
         pass
 
-    # 3. Environment variables
     for env_k in ["GEMINI_API_KEY", "GOOGLE_API_KEY"]:
         if os.environ.get(env_k):
             keys.append(os.environ[env_k].strip())
 
-    # Deduplicate while preserving order
     seen = set()
     deduped = []
     for k in keys:
@@ -373,10 +369,19 @@ def parse_acknowledgement_pdf(file_bytes):
             r"District\s*Name\s*[:\-\|]?\s*([A-Za-z\s]+?)(?=\s*Current|\s*Status|\s*Ack|\n|$)",
             r"District\s*[:\-\|]?\s*([A-Za-z\s]+?)(?=\s*Current|\s*Status|\n|$)"
         ])
-        parsed["current_status"] = search_value([
-            r"Current\s*Status\s*[:\-\|]?\s*([A-Za-z0-9\s\.]+?)(?=\s*Print|\s*Exit|\n|$)",
-            r"Status\s*[:\-\|]?\s*([A-Za-z0-9\s\.]+?)(?=\s*Print|\n|$)"
+
+        # Precision Status Matcher: Prevents pulling "Application Id" into the status box
+        status_match = search_value([
+            r"Current\s*Status\s*[:\-\|]?\s*(Submitted|Pending|Approved|Rejected|Verified|In\s*Process)",
+            r"Status\s*[:\-\|]?\s*(Submitted|Pending|Approved|Rejected|Verified|In\s*Process)",
+            r"\b(Submitted|Pending|Approved|Rejected|Verified)\b"
         ])
+        
+        # Guard: If raw text extraction matched "Application" or an ID string, reset cleanly
+        if not status_match or "application" in status_match.lower() or "f18" in status_match.lower():
+            status_match = "Submitted"
+            
+        parsed["current_status"] = status_match
         return parsed
     except Exception:
         return {}
@@ -396,7 +401,7 @@ def parse_with_vision_pool(file_bytes, mime_type, api_keys):
   "house_number": "House Number",
   "mlc_constituency": "Constituency Name",
   "district_name": "District Name",
-  "current_status": "Status if visible"
+  "current_status": "Current status like Submitted or Pending. Do NOT put the Application ID here."
 }
 Return raw JSON only."""
 
@@ -412,7 +417,7 @@ Return raw JSON only."""
 
     models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
 
-    for key_idx, key in enumerate(api_keys):
+    for key in api_keys:
         for model in models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
             try:
@@ -420,9 +425,13 @@ Return raw JSON only."""
                 if res.status_code == 200:
                     body = res.json()
                     text_content = body["candidates"][0]["content"]["parts"][0]["text"]
-                    return json.loads(text_content)
+                    data = json.loads(text_content)
+                    # Clean up status field if model confused it with Application ID
+                    st_val = data.get("current_status", "")
+                    if "application" in st_val.lower() or "f18" in st_val.lower() or not st_val:
+                        data["current_status"] = "Submitted"
+                    return data
                 elif res.status_code in [429, 401, 403]:
-                    # Quota or auth issue with this key, break inner loop to try next key in pool
                     break
             except Exception:
                 continue
@@ -434,13 +443,11 @@ def extract_universal_document(uploaded_file, api_keys):
     filename = uploaded_file.name.lower()
     file_bytes = uploaded_file.getvalue()
 
-    # 1. Digital PDF extraction (Instant, offline, zero quota used)
     if filename.endswith(".pdf"):
         data = parse_acknowledgement_pdf(file_bytes)
         if data.get("application_id") or data.get("applicant_name"):
             return data, "Offline PDF Engine"
 
-    # 2. Photos/Images (JPG/PNG/WEBP) or Scanned PDFs via Vision Pool
     mime_type = "application/pdf"
     if filename.endswith((".jpg", ".jpeg")):
         mime_type = "image/jpeg"
@@ -639,7 +646,7 @@ with main_tab1:
                         st.session_state["field_relation_name"] = extracted_info.get("relation_name", "")
                         st.session_state["field_house_no"] = extracted_info.get("house_number", "")
                         st.session_state["field_constituency"] = extracted_info.get("mlc_constituency", "") or "Warangal-Khammam-Nalgonda"
-                        st.session_state["field_ack_status"] = extracted_info.get("current_status", "")
+                        st.session_state["field_ack_status"] = extracted_info.get("current_status", "Submitted")
                         st.session_state["field_ack_district"] = extracted_info.get("district_name", "")
                         st.session_state["last_file_hash"] = current_hash
                         st.session_state["last_engine"] = engine_used
