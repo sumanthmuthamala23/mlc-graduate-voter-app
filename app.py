@@ -17,40 +17,24 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- EMBEDDED WATERMARK LOGO (PINNED TO LEFT SIDE) ---
-def get_base64_logo():
+# --- EMBEDDED LOGO DATA LOADER ---
+def get_logo_path():
     for filename in ["brs_logo.webp", "brs_logo.jpg", "brs_logo.png"]:
         if os.path.exists(filename):
-            ext = filename.split(".")[-1]
-            mime = "image/webp" if ext == "webp" else f"image/{ext}"
-            with open(filename, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode()
-                return f"data:{mime};base64,{b64}"
-    return ""
+            return filename
+    return None
 
-logo_data_uri = get_base64_logo()
-
-# Stick logo strictly to left side with low opacity so text has zero interference
-watermark_style = ""
-if logo_data_uri:
-    watermark_style = f"""
-        background-image: url("{logo_data_uri}");
-        background-repeat: no-repeat;
-        background-position: left 40px center;
-        background-size: 380px;
-        background-attachment: fixed;
-    """
+logo_path = get_logo_path()
 
 # --- BRS THEME CLEAN STYLING ---
-st.markdown(f"""
+st.markdown("""
 <style>
-    .stApp {{
+    .stApp {
         background-color: #FFF6FA !important;
-        {watermark_style}
-    }}
+    }
 
     /* Top Banner Header */
-    .brs-banner {{
+    .brs-banner {
         background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%);
         color: white !important;
         padding: 16px 24px;
@@ -60,49 +44,51 @@ st.markdown(f"""
         display: flex;
         align-items: center;
         gap: 15px;
-    }}
-    .brs-car-badge {{
+    }
+    .brs-car-badge {
         font-size: 34px;
         background: rgba(255, 255, 255, 0.2);
         border-radius: 10px;
         padding: 4px 10px;
-    }}
-    .brs-banner h1 {{
+    }
+    .brs-banner h1 {
         color: #FFFFFF !important;
         font-size: 22px !important;
         font-weight: 800 !important;
         margin: 0 !important;
-    }}
-    .brs-banner p {{
+    }
+    .brs-banner p {
         color: #FCE4EC !important;
         font-size: 13px !important;
         margin: 2px 0 0 0 !important;
-    }}
+    }
 
-    /* Clean Card Styling */
-    [data-testid="stForm"] {{
+    /* Clean Card Form */
+    [data-testid="stForm"] {
         background-color: #FFFFFF !important;
         border: 1.5px solid #F5B6CE !important;
         border-radius: 14px !important;
-        padding: 26px !important;
-        box-shadow: 0 8px 24px rgba(230, 26, 141, 0.12) !important;
-    }}
+        padding: 24px !important;
+        box-shadow: 0 8px 24px rgba(230, 26, 141, 0.10) !important;
+    }
 
     /* Inputs */
-    .stTextInput input {{
+    .stTextInput input {
         background-color: #FAFAFC !important;
-        border: 1px solid #CBD5E1 !important;
+        border: 1.5px solid #CBD5E1 !important;
         border-radius: 8px !important;
         color: #0F172A !important;
+        font-size: 14px !important;
         font-weight: 500 !important;
-    }}
-    .stTextInput input:focus {{
+        padding: 8px 12px !important;
+    }
+    .stTextInput input:focus {
         border-color: #E61A8D !important;
         box-shadow: 0 0 0 2px rgba(230, 26, 141, 0.2) !important;
-    }}
+    }
 
-    /* Buttons */
-    div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {{
+    /* Primary BRS Button */
+    div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {
         background: linear-gradient(90deg, #E61A8D 0%, #D81B60 100%) !important;
         color: white !important;
         font-size: 15px !important;
@@ -111,41 +97,63 @@ st.markdown(f"""
         border: none !important;
         padding: 10px 20px !important;
         box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3) !important;
-    }}
-    div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {{
+    }
+    div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {
         background: linear-gradient(90deg, #C2185B 0%, #AD1457 100%) !important;
-    }}
+    }
+
+    /* Info Instructions Box placed cleanly below Sign In */
+    .info-card {
+        background: #FFFFFF;
+        border-left: 4px solid #E61A8D;
+        border-radius: 10px;
+        padding: 16px 20px;
+        margin-top: 20px;
+        box-shadow: 0 4px 14px rgba(230, 26, 141, 0.08);
+    }
+    .info-card h4 {
+        color: #C2185B !important;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        margin: 0 0 6px 0 !important;
+    }
+    .info-card p {
+        color: #334155 !important;
+        font-size: 13.5px !important;
+        line-height: 1.5 !important;
+        margin: 0 0 6px 0 !important;
+    }
 
     /* Tab Highlights */
-    button[data-baseweb="tab"] {{
+    button[data-baseweb="tab"] {
         font-weight: 600 !important;
         font-size: 14px !important;
         color: #64748B !important;
-    }}
-    button[data-baseweb="tab"][aria-selected="true"] {{
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
         color: #E61A8D !important;
         border-bottom: 3px solid #E61A8D !important;
         font-weight: 800 !important;
-    }}
+    }
 
     /* Sidebar */
-    section[data-testid="stSidebar"] {{
+    section[data-testid="stSidebar"] {
         background-color: #FFF7FA !important;
         border-right: 1.5px solid #F8BBD0 !important;
-    }}
+    }
 
     /* KPI Metrics */
-    div[data-testid="stMetric"] {{
+    div[data-testid="stMetric"] {
         background: #FFFFFF;
         border-left: 5px solid #E61A8D;
         border-radius: 10px;
         padding: 14px 18px;
         box-shadow: 0 2px 10px rgba(230, 26, 141, 0.08);
-    }}
-    div[data-testid="stMetricValue"] {{
+    }
+    div[data-testid="stMetricValue"] {
         color: #C2185B !important;
         font-weight: 800 !important;
-    }}
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -362,19 +370,19 @@ if "logged_in" not in st.session_state:
     st.session_state.full_name = None
 
 # ==============================================================================
-# LOGIN SCREEN (LOGO ON LEFT, FORM ON RIGHT)
+# LOGIN SCREEN: LOGO ON LEFT (CLEAN), FORM & WORDS ON RIGHT
 # ==============================================================================
 if not st.session_state.logged_in:
     render_banner()
 
-    col_brand, col_form = st.columns([1.1, 1.2], gap="large")
+    col_logo, col_form = st.columns([1, 1.25], gap="large")
 
-    with col_brand:
-        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
-        st.markdown("### 🌸 భారత రాష్ట్ర సమితి (BRS)")
-        st.markdown("#### **War Room Graduate Voter Console**")
-        st.caption("Warangal – Khammam – Nalgonda Graduate MLC Constituency")
-        st.info("📌 **Welcome to the Central Voter Intake Portal.**\n\nAuthorized War Room Operators and Volunteers can log in to upload CEO Telangana Form-18 verification slips and synchronize voter records directly to the constituency database.")
+    with col_logo:
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        if logo_path:
+            st.image(logo_path, use_container_width=True)
+        else:
+            st.markdown("<div style='font-size:120px; text-align:center;'>🚗</div>", unsafe_allow_html=True)
 
     with col_form:
         tab1, tab2 = st.tabs(["🔑 War Room Sign In", "📝 Volunteer Registration"])
@@ -414,6 +422,19 @@ if not st.session_state.logged_in:
                             st.success(msg)
                         else:
                             st.error(msg)
+
+        # Clear, formatted text placed directly bottom of the Sign In box
+        st.markdown("""
+        <div class="info-card">
+            <h4>🌸 భారత రాష్ట్ర సమితి (BRS) — War Room Console</h4>
+            <p><strong>Warangal – Khammam – Nalgonda Graduate MLC Constituency</strong></p>
+            <p style="color: #475569;">
+                📌 <strong>Welcome to the Central Voter Intake Portal:</strong><br>
+                Authorized War Room Operators and Volunteers can log in to upload CEO Telangana Form-18 verification slips and synchronize voter records directly to the constituency database.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
     st.stop()
 
 # ==============================================================================
@@ -535,7 +556,7 @@ with main_tab1:
 
                             if app_id in existing_ids:
                                 log_duplicate(app_id, name, st.session_state.username)
-                                st.warning(f"⚠️️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
+                                st.warning(f"⚠️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
                             else:
                                 new_entry = [
                                     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
