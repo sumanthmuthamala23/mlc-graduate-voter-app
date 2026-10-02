@@ -1,5 +1,6 @@
 import streamlit as st
 from pypdf import PdfReader
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
@@ -348,6 +349,39 @@ def get_configured_api_keys():
             deduped.append(k)
     return deduped
 
+# Image Enhancement Engine for Unclear, Low-Contrast, or Blurry Photos
+def enhance_image_for_ocr(image_bytes):
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        
+        # Auto-orient based on EXIF tag
+        img = ImageOps.exif_transpose(img)
+        
+        # If dimensions are small (like a mobile thumbnail), upscale with high quality
+        w, h = img.size
+        if w < 1200 or h < 1200:
+            scale_factor = max(1200 / w, 1200 / h)
+            new_size = (int(w * scale_factor), int(h * scale_factor))
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
+
+        # Convert to Grayscale to strip distracting color compression artifacts
+        gray = img.convert('L')
+        
+        # Boost Contrast (makes faint gray text dark and clear)
+        contrast_enhancer = ImageEnhance.Contrast(gray)
+        enhanced_contrast = contrast_enhancer.enhance(1.8)
+        
+        # Boost Sharpness (crisp edges around letters & numbers)
+        sharp_enhancer = ImageEnhance.Sharpness(enhanced_contrast)
+        sharpened = sharp_enhancer.enhance(2.0)
+        
+        # Export as high-quality PNG bytes
+        out_buf = io.BytesIO()
+        sharpened.save(out_buf, format="PNG")
+        return out_buf.getvalue(), "image/png"
+    except Exception:
+        return image_bytes, "image/jpeg"
+
 # Engine 1: Pure Offline PDF Text Extraction
 def parse_acknowledgement_pdf(file_bytes):
     try:
@@ -405,7 +439,6 @@ def parse_acknowledgement_pdf(file_bytes):
             r"District\s*[:\-\|]?\s*([A-Za-z\s]+?)(?=\s*Current|\s*Status|\n|$)"
         ])
 
-        # Precise Status Clean: never allow Application ID to infect Status
         status_match = search_value([
             r"Current\s*Status\s*[:\-\|]?\s*(Submitted|Pending|Approved|Rejected|Verified|In\s*Process)",
             r"Status\s*[:\-\|]?\s*(Submitted|Pending|Approved|Rejected|Verified|In\s*Process)",
@@ -419,24 +452,34 @@ def parse_acknowledgement_pdf(file_bytes):
     except Exception:
         return {}, ""
 
-# Engine 2: Google Lens Multi-Key Vision Model for Screenshots & JPEGs
+# Engine 2: Google Lens Multi-Key Vision Model with Text Fallback & Image Enhancement
 def parse_with_google_lens(file_bytes, mime_type, api_keys):
     if not api_keys:
         return {}, ""
 
     b64_data = base64.b64encode(file_bytes).decode('utf-8')
-    prompt_text = """Act as an advanced Google Lens OCR scanner for this CEO Telangana Form-18 voter acknowledgement receipt screenshot/photo.
-Extract the visible voter details and return ONLY a valid JSON object matching this schema:
+    prompt_text = """You are an expert Google Lens OCR system scanning a CEO Telangana Form-18 Acknowledgement Slip / Graduate Voter Slip.
+Even if the image is blurry, low contrast, cropped, or slightly tilted:
+1. Locate the 'Application Id' (starts with 'F' followed by 10-15 digits, like F180928310521426).
+2. Locate 'Applicant Name' (in English capital letters).
+3. Locate 'Gender' (Male / Female).
+4. Locate 'Relation Name' (Father / Husband name).
+5. Locate 'House Number' (e.g. 7-3-410/6).
+6. Locate 'Mlc Name' / 'Constituency' (e.g. Warangal-Khammam-Nalgonda).
+7. Locate 'District Name' (e.g. Khammam, Nalgonda, Warangal, Suryapet).
+8. Status is strictly 'Submitted'. Do NOT copy the Application ID into status.
+
+Return ONLY a valid JSON object matching this schema:
 {
-  "application_id": "Application ID / Slip number (e.g. F180928310521426)",
-  "applicant_name": "Full Applicant Name",
-  "gender": "Male or Female",
-  "relation_name": "Father / Husband / Relation Name",
-  "house_number": "House Number",
-  "mlc_constituency": "Constituency (e.g. Warangal-Khammam-Nalgonda)",
-  "district_name": "District Name (e.g. Khammam, Nalgonda, Warangal)",
-  "current_status": "Strictly 'Submitted' or 'Pending'. NEVER set this to the Application ID.",
-  "ocr_full_text": "Complete verbatim text detected across the entire image"
+  "application_id": "...",
+  "applicant_name": "...",
+  "gender": "...",
+  "relation_name": "...",
+  "house_number": "...",
+  "mlc_constituency": "...",
+  "district_name": "...",
+  "current_status": "Submitted",
+  "ocr_full_text": "all readable text"
 }"""
 
     payload = {
@@ -455,426 +498,11 @@ Extract the visible voter details and return ONLY a valid JSON object matching t
         for model in models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
             try:
-                res = requests.post(url, json=payload, timeout=25)
+                res = requests.post(url, json=payload, timeout=28)
                 if res.status_code == 200:
                     body = res.json()
                     text_content = body["candidates"][0]["content"]["parts"][0]["text"]
-                    data = json.loads(text_content)
                     
-                    # Safety check on Status
-                    st_val = data.get("current_status", "")
-                    if "application" in st_val.lower() or "f18" in st_val.lower() or not st_val:
-                        data["current_status"] = "Submitted"
-
-                    ocr_raw = data.pop("ocr_full_text", "")
-                    return data, ocr_raw
-                elif res.status_code in [429, 401, 403]:
-                    break
-            except Exception:
-                continue
-
-    return {}, ""
-
-# Universal Multi-Device Router (PDF, JPG, JPEG, PNG, WEBP)
-def extract_universal_document(uploaded_file, file_bytes, api_keys):
-    filename = uploaded_file.name.lower() if hasattr(uploaded_file, 'name') else "image.jpg"
-
-    # 1. Standard Digital PDF
-    if filename.endswith(".pdf"):
-        data, raw_txt = parse_acknowledgement_pdf(file_bytes)
-        if data.get("application_id") or data.get("applicant_name"):
-            return data, raw_txt, "PDF Text Engine"
-
-    # 2. Photos, Screenshots, JPEGs via Google Lens Vision
-    mime_type = "image/jpeg"
-    if filename.endswith(".png"):
-        mime_type = "image/png"
-    elif filename.endswith(".webp"):
-        mime_type = "image/webp"
-    elif filename.endswith(".pdf"):
-        mime_type = "application/pdf"
-
-    if api_keys:
-        lens_data, raw_txt = parse_with_google_lens(file_bytes, mime_type, api_keys)
-        if lens_data.get("application_id") or lens_data.get("applicant_name"):
-            return lens_data, raw_txt, "Google Lens AI Module"
-        return {}, "", "Vision Error"
-
-    return {}, "", "Needs API Key"
-
-def verify_user(username, password):
-    pwd_hash = hashlib.sha256(password.encode()).hexdigest()
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT full_name, role, status FROM users WHERE username = ? AND password_hash = ?", (username, pwd_hash))
-    user = c.fetchone()
-    conn.close()
-    return user
-
-def register_user(username, password, full_name):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    pwd_hash = hashlib.sha256(password.encode()).hexdigest()
-    try:
-        c.execute("INSERT INTO users VALUES (?, ?, ?, 'Staff', 'Pending')", (username, pwd_hash, full_name))
-        conn.commit()
-        conn.close()
-        return True, "Registration successful! Awaiting War Room approval."
-    except sqlite3.IntegrityError:
-        conn.close()
-        return False, "Username already exists."
-
-def log_duplicate(app_id, name, operator):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("INSERT INTO duplicate_audit (timestamp, application_id, applicant_name, operator) VALUES (?, ?, ?, ?)",
-              (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), app_id, name, operator))
-    conn.commit()
-    conn.close()
-
-# Session State Initialization
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.username = None
-    st.session_state.role = None
-    st.session_state.full_name = None
-
-form_fields = [
-    "field_app_id", "field_applicant_name", "field_gender",
-    "field_relation_name", "field_house_no", "field_constituency",
-    "field_ack_status", "field_ack_district", "last_file_hash", "lens_detected_raw"
-]
-for f in form_fields:
-    if f not in st.session_state:
-        st.session_state[f] = ""
-
-# Login Screen
-if not st.session_state.logged_in:
-    render_top_poster()
-
-    _, col_form, _ = st.columns([1, 1.8, 1])
-
-    with col_form:
-        tab1, tab2 = st.tabs(["🔑 War Room Sign In", "📝 Volunteer Registration"])
-
-        with tab1:
-            with st.form("login_form"):
-                uname = st.text_input("Username", placeholder="e.g. admin")
-                pword = st.text_input("Password", type="password", placeholder="Enter your password")
-                submit = st.form_submit_button("🚀 Sign In to Console", use_container_width=True)
-                if submit:
-                    user_info = verify_user(uname, pword)
-                    if user_info:
-                        fname, role, status = user_info
-                        if status != "Approved":
-                            st.error("⏳ Account pending War Room Admin approval.")
-                        else:
-                            st.session_state.logged_in = True
-                            st.session_state.username = uname
-                            st.session_state.role = role
-                            st.session_state.full_name = fname
-                            st.rerun()
-                    else:
-                        st.error("Invalid Username or Password.")
-
-        with tab2:
-            with st.form("register_form"):
-                new_name = st.text_input("Full Name", placeholder="Your Full Name")
-                new_uname = st.text_input("Desired Username", placeholder="Choose username")
-                new_pwd = st.text_input("Password", type="password", placeholder="Create password")
-                reg_submit = st.form_submit_button("Submit Registration", use_container_width=True)
-                if reg_submit:
-                    if not new_uname or not new_pwd or not new_name:
-                        st.warning("All fields are required.")
-                    else:
-                        ok, msg = register_user(new_uname, new_pwd, new_name)
-                        if ok:
-                            st.success(msg)
-                        else:
-                            st.error(msg)
-
-        st.markdown("""
-        <div class="portal-info-box">
-            <h4>🌸 భారత రాష్ట్ర సమితి (BRS) — War Room Console</h4>
-            <p><strong>Warangal – Khammam – Nalgonda Graduate MLC Constituency</strong></p>
-            <p style="margin-top: 6px; color: #475569;">
-                🔍 <strong>Integrated Google Lens Scanner:</strong><br>
-                Upload any mobile screenshot, WhatsApp photo, or physical paper slip to instantly extract voter acknowledgement details into the system.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.stop()
-
-# Workspace
-configured_keys = get_configured_api_keys()
-
-with st.sidebar:
-    st.markdown("""
-    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
-        <span style="font-size:24px;">🚗</span>
-        <h3 style="margin:0; color:#E61A8D;">BRS War Room</h3>
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown(f"**Operator:** {st.session_state.full_name}")
-    st.markdown(f"**Role:** `{st.session_state.role}`")
-    st.caption(f"🔑 Active OCR Engines Loaded: **{len(configured_keys)} Keys**")
-    if st.button("Log Out", use_container_width=True):
-        st.session_state.logged_in = False
-        st.rerun()
-    st.divider()
-
-    with st.expander("⚙️ Backup API Key"):
-        custom_k = st.text_input("Temporary Backup Key", type="password", value=st.session_state.get("custom_gemini_key", ""))
-        if custom_k:
-            st.session_state["custom_gemini_key"] = custom_k
-            configured_keys = get_configured_api_keys()
-
-    if st.session_state.role == "Admin":
-        st.subheader("👥 Volunteer Approvals")
-        conn = sqlite3.connect(DB_FILE)
-        users_df = pd.read_sql_query("SELECT username, full_name, role, status FROM users", conn)
-        conn.close()
-
-        pending_users = users_df[users_df["status"] == "Pending"]
-        if not pending_users.empty:
-            for _, row in pending_users.iterrows():
-                col1, col2 = st.columns([2, 1])
-                col1.caption(f"{row['full_name']} (`{row['username']}`)")
-                if col2.button("Approve", key=f"app_{row['username']}"):
-                    conn = sqlite3.connect(DB_FILE)
-                    conn.execute("UPDATE users SET status = 'Approved' WHERE username = ?", (row['username'],))
-                    conn.commit()
-                    conn.close()
-                    st.rerun()
-        else:
-            st.caption("No pending registrations.")
-
-render_top_poster()
-
-if st.session_state.role == "Admin":
-    main_tab1, main_tab2 = st.tabs(["📥 Data Ingestion & Form-18 Processing", "📊 War Room Analytics & Mandal Breakdown"])
-else:
-    main_tab1 = st.container()
-
-# TAB 1: FORM-18 ENTRY
-with main_tab1:
-    upload_col, data_col = st.columns([1, 1.25], gap="large")
-
-    with upload_col:
-        st.markdown("""
-        <div class="lens-header-card">
-            <div class="lens-icon-badge">🔍</div>
-            <div>
-                <div class="lens-title">Google Lens Form-18 Scanner</div>
-                <div class="lens-desc">Screenshots, WhatsApp Photos, JPEGs, PNGs & PDFs</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        input_choice = st.radio("Choose Input Method:", ["📁 Upload File (Screenshot/JPEG/PDF)", "📷 Live Camera Scan"], horizontal=True)
-
-        target_file_obj = None
-        target_bytes = None
-
-        if input_choice == "📁 Upload File (Screenshot/JPEG/PDF)":
-            target_file_obj = st.file_uploader(
-                "Drop Form-18 Screenshot or Document",
-                type=["pdf", "png", "jpg", "jpeg", "webp"],
-                key="form18_universal_uploader"
-            )
-            if target_file_obj:
-                target_bytes = target_file_obj.getvalue()
-        else:
-            cam_pic = st.camera_input("Point camera at Form-18 slip", key="form18_camera_scanner")
-            if cam_pic:
-                target_file_obj = cam_pic
-                target_bytes = cam_pic.getvalue()
-
-        if target_bytes:
-            current_hash = hashlib.md5(target_bytes).hexdigest()
-
-            if st.session_state["last_file_hash"] != current_hash:
-                with st.spinner("🔍 Google Lens is scanning document text..."):
-                    extracted_info, raw_ocr, engine_used = extract_universal_document(target_file_obj, target_bytes, configured_keys)
-
-                    if extracted_info.get("application_id") or extracted_info.get("applicant_name"):
-                        st.session_state["field_app_id"] = extracted_info.get("application_id", "")
-                        st.session_state["field_applicant_name"] = extracted_info.get("applicant_name", "")
-                        st.session_state["field_gender"] = extracted_info.get("gender", "")
-                        st.session_state["field_relation_name"] = extracted_info.get("relation_name", "")
-                        st.session_state["field_house_no"] = extracted_info.get("house_number", "")
-                        st.session_state["field_constituency"] = extracted_info.get("mlc_constituency", "") or "Warangal-Khammam-Nalgonda"
-                        st.session_state["field_ack_status"] = extracted_info.get("current_status", "Submitted")
-                        st.session_state["field_ack_district"] = extracted_info.get("district_name", "")
-                        st.session_state["lens_detected_raw"] = raw_ocr
-                        st.session_state["last_file_hash"] = current_hash
-                        st.session_state["last_engine"] = engine_used
-                        st.rerun()
-                    elif engine_used == "Needs API Key":
-                        st.warning("📸 Please configure GEMINI_API_KEYS in Streamlit Secrets.")
-                    else:
-                        st.error("Could not parse text. Ensure the screenshot is clear or enter the details manually.")
-
-        if st.session_state["field_app_id"]:
-            engine_label = st.session_state.get("last_engine", "Extracted")
-            st.success(f"✅ **{engine_label}**: Detected **{st.session_state['field_applicant_name']}** (`{st.session_state['field_app_id']}`)")
-            
-            # Google Lens Raw Text Inspection Drawer
-            if st.session_state["lens_detected_raw"]:
-                with st.expander("📋 Lens Detected Raw Text"):
-                    st.text(st.session_state["lens_detected_raw"][:800])
-
-    with data_col:
-        st.markdown("#### 2. Review & Tag Jurisdiction Details")
-
-        with st.form("voter_entry_form"):
-            st.markdown("##### 👤 Applicant Information")
-            c1, c2 = st.columns(2)
-            app_id = c1.text_input("Application ID", value=st.session_state["field_app_id"])
-            name = c2.text_input("Applicant Name", value=st.session_state["field_applicant_name"])
-
-            c3, c4, c5 = st.columns(3)
-            gender = c3.text_input("Gender", value=st.session_state["field_gender"])
-            relation = c4.text_input("Relation Name", value=st.session_state["field_relation_name"])
-            house_no = c5.text_input("House Number", value=st.session_state["field_house_no"])
-
-            c6, c7 = st.columns(2)
-            mlc_const = c6.text_input("Constituency", value=st.session_state["field_constituency"] or "Warangal-Khammam-Nalgonda")
-            status = c7.text_input("Status", value=st.session_state["field_ack_status"])
-
-            st.markdown("---")
-            st.markdown("##### 📍 Tag Jurisdiction (MLC Limits)")
-            
-            all_districts = list(JURISDICTION_DATA.keys())
-            
-            default_dist_idx = 0
-            detected_district = st.session_state["field_ack_district"].strip().lower()
-            for idx, d_name in enumerate(all_districts):
-                if d_name.lower() in detected_district or detected_district in d_name.lower():
-                    default_dist_idx = idx
-                    break
-
-            selected_district = st.selectbox("Select District", all_districts, index=default_dist_idx)
-            available_mandals = list(JURISDICTION_DATA[selected_district].keys())
-            selected_mandal = st.selectbox("Select Mandal", available_mandals)
-            
-            available_villages = JURISDICTION_DATA[selected_district][selected_mandal] + ["Other / Unlisted"]
-            selected_village = st.selectbox("Select Revenue Village / Ward", available_villages)
-            final_village = st.text_input("Enter Revenue Village Name") if selected_village == "Other / Unlisted" else selected_village
-
-            st.markdown("---")
-            st.markdown("##### 🤝 Party Volunteer & Reference Details")
-            r1, r2 = st.columns(2)
-            ref_name = r1.text_input("Party Reference / Cadre Name", value="", placeholder="Enter Reference / Mandal Incharge Name")
-            mobile_no = r2.text_input("Voter Mobile Number", placeholder="10-digit number")
-            remarks = st.text_area("Remarks / Notes", placeholder="e.g., Degree Certificate verified, BRS supporter")
-
-            save_btn = st.form_submit_button("🚗 Save & Submit to BRS Voter Database", use_container_width=True)
-
-            if save_btn:
-                if not app_id or not name:
-                    st.error("Application ID and Applicant Name are mandatory.")
-                else:
-                    ws, err = get_worksheet()
-                    if ws is None:
-                        st.error(f"Database Connection Failed: {err}")
-                    else:
-                        try:
-                            rows = ws.get_all_values()
-                            header_row = rows[0] if rows else HEADERS
-                            idx = header_row.index("Application ID") if "Application ID" in header_row else 1
-                            existing_ids = [r[idx] for r in rows[1:] if len(r) > idx]
-
-                            if app_id in existing_ids:
-                                log_duplicate(app_id, name, st.session_state.username)
-                                st.warning(f"⚠️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
-                            else:
-                                new_entry = [
-                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                    app_id, name, gender, relation, house_no,
-                                    mlc_const, st.session_state["field_ack_district"], status,
-                                    selected_district, selected_mandal, final_village,
-                                    ref_name, mobile_no, remarks, st.session_state.username
-                                ]
-                                ws.append_row(new_entry)
-                                st.success(f"🎉 Successfully Ingested: {name} ({app_id}) to BRS Central Records!")
-                                
-                                for f in form_fields:
-                                    st.session_state[f] = ""
-                        except Exception as ex:
-                            st.error(f"Error appending row: {ex}")
-
-# TAB 2: WAR ROOM ANALYTICS
-if st.session_state.role == "Admin":
-    with main_tab2:
-        st.markdown("### 📊 Constituency Consolidation Dashboard")
-
-        ws, err = get_worksheet()
-        if ws is None:
-            st.error(f"Cannot load live analytics: {err}")
-        else:
-            try:
-                sheet_data = ws.get_all_values()
-                if len(sheet_data) <= 1:
-                    st.info("No applications recorded yet.")
-                else:
-                    df = pd.DataFrame(sheet_data[1:], columns=sheet_data[0])
-
-                    conn = sqlite3.connect(DB_FILE)
-                    dup_df = pd.read_sql_query("SELECT * FROM duplicate_audit ORDER BY id DESC", conn)
-                    conn.close()
-
-                    m1, m2, m3, m4 = st.columns(4)
-                    total_votes = len(df)
-                    unique_voters = df["Application ID"].nunique() if "Application ID" in df.columns else total_votes
-                    duplicate_attempts = len(dup_df)
-                    active_operators = df["Operator Username"].nunique() if "Operator Username" in df.columns else 1
-
-                    m1.metric("Total Ingested Votes", f"{total_votes:,}")
-                    m2.metric("Unique Verified Voters", f"{unique_voters:,}")
-                    m3.metric("Duplicates Filtered", f"{duplicate_attempts:,}")
-                    m4.metric("Active War Room Cadre", f"{active_operators}")
-
-                    st.divider()
-
-                    st.subheader("📍 Mandal-Wise Mobilization Breakdown")
-                    d_col1, _ = st.columns([1, 2])
-
-                    with d_col1:
-                        dist_filter = st.selectbox(
-                            "Filter by Revenue District",
-                            ["All Districts"] + sorted(list(df["Jurisdiction District"].dropna().unique()))
-                        )
-
-                    filtered_df = df if dist_filter == "All Districts" else df[df["Jurisdiction District"] == dist_filter]
-
-                    if "Mandal" in filtered_df.columns and not filtered_df.empty:
-                        mandal_counts = filtered_df["Mandal"].value_counts().reset_index()
-                        mandal_counts.columns = ["Mandal", "Total Ingested Votes"]
-
-                        t_col, c_col = st.columns([1, 1.4])
-                        with t_col:
-                            st.write(f"**Mandal Summary ({dist_filter})**")
-                            st.dataframe(mandal_counts, use_container_width=True, hide_index=True)
-                        with c_col:
-                            st.write(f"**Mandal Distribution Chart**")
-                            st.bar_chart(mandal_counts.set_index("Mandal"), color="#E61A8D")
-
-                    st.divider()
-
-                    st.subheader("🚨 Live Duplicate Submissions Log")
-                    if not dup_df.empty:
-                        st.dataframe(
-                            dup_df[["timestamp", "application_id", "applicant_name", "operator"]],
-                            use_container_width=True,
-                            hide_index=True
-                        )
-                    else:
-                        st.caption("Zero duplicate attempts recorded so far.")
-
-                    with st.expander("📄 View Latest 50 Ingested Voter Records"):
-                        st.dataframe(df.tail(50), use_container_width=True)
-
-            except Exception as e:
-                st.error(f"Error computing dashboard analytics: {e}")
+                    # Clean markdown fence tags if returned
+                    clean_json_str = re.sub(r'^```json\s*', '', text_content.strip(), flags=re.MULTILINE)
+                    clean_json_str = re.sub(r'^
