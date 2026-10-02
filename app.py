@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- EMBEDDED WATERMARK LOGO ---
+# --- EMBEDDED WATERMARK LOGO (PINNED TO LEFT SIDE) ---
 def get_base64_logo():
     for filename in ["brs_logo.webp", "brs_logo.jpg", "brs_logo.png"]:
         if os.path.exists(filename):
@@ -30,37 +30,39 @@ def get_base64_logo():
 
 logo_data_uri = get_base64_logo()
 
+# Stick logo strictly to left side with low opacity so text has zero interference
 watermark_style = ""
 if logo_data_uri:
     watermark_style = f"""
         background-image: url("{logo_data_uri}");
         background-repeat: no-repeat;
-        background-position: center 60%;
-        background-size: 480px;
+        background-position: left 40px center;
+        background-size: 380px;
         background-attachment: fixed;
     """
 
-# --- BULLETPROOF BRS STYLING ---
+# --- BRS THEME CLEAN STYLING ---
 st.markdown(f"""
 <style>
     .stApp {{
-        background-color: #FFF2F7;
+        background-color: #FFF6FA !important;
         {watermark_style}
     }}
 
+    /* Top Banner Header */
     .brs-banner {{
         background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%);
         color: white !important;
-        padding: 18px 24px;
+        padding: 16px 24px;
         border-radius: 12px;
         box-shadow: 0 4px 14px rgba(230, 26, 141, 0.25);
-        margin-bottom: 20px;
+        margin-bottom: 24px;
         display: flex;
         align-items: center;
         gap: 15px;
     }}
     .brs-car-badge {{
-        font-size: 36px;
+        font-size: 34px;
         background: rgba(255, 255, 255, 0.2);
         border-radius: 10px;
         padding: 4px 10px;
@@ -74,19 +76,32 @@ st.markdown(f"""
     .brs-banner p {{
         color: #FCE4EC !important;
         font-size: 13px !important;
-        margin: 3px 0 0 0 !important;
+        margin: 2px 0 0 0 !important;
     }}
 
-    /* Card styling without breaking DOM tree */
+    /* Clean Card Styling */
     [data-testid="stForm"] {{
-        background-color: rgba(255, 255, 255, 0.95) !important;
-        border: 1.5px solid #F8BBD0 !important;
-        border-radius: 12px !important;
-        padding: 24px !important;
-        box-shadow: 0 6px 18px rgba(230, 26, 141, 0.12) !important;
+        background-color: #FFFFFF !important;
+        border: 1.5px solid #F5B6CE !important;
+        border-radius: 14px !important;
+        padding: 26px !important;
+        box-shadow: 0 8px 24px rgba(230, 26, 141, 0.12) !important;
     }}
 
-    /* Primary BRS Buttons */
+    /* Inputs */
+    .stTextInput input {{
+        background-color: #FAFAFC !important;
+        border: 1px solid #CBD5E1 !important;
+        border-radius: 8px !important;
+        color: #0F172A !important;
+        font-weight: 500 !important;
+    }}
+    .stTextInput input:focus {{
+        border-color: #E61A8D !important;
+        box-shadow: 0 0 0 2px rgba(230, 26, 141, 0.2) !important;
+    }}
+
+    /* Buttons */
     div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {{
         background: linear-gradient(90deg, #E61A8D 0%, #D81B60 100%) !important;
         color: white !important;
@@ -97,11 +112,39 @@ st.markdown(f"""
         padding: 10px 20px !important;
         box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3) !important;
     }}
+    div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {{
+        background: linear-gradient(90deg, #C2185B 0%, #AD1457 100%) !important;
+    }}
 
+    /* Tab Highlights */
+    button[data-baseweb="tab"] {{
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        color: #64748B !important;
+    }}
     button[data-baseweb="tab"][aria-selected="true"] {{
         color: #E61A8D !important;
-        border-bottom-color: #E61A8D !important;
-        font-weight: 700 !important;
+        border-bottom: 3px solid #E61A8D !important;
+        font-weight: 800 !important;
+    }}
+
+    /* Sidebar */
+    section[data-testid="stSidebar"] {{
+        background-color: #FFF7FA !important;
+        border-right: 1.5px solid #F8BBD0 !important;
+    }}
+
+    /* KPI Metrics */
+    div[data-testid="stMetric"] {{
+        background: #FFFFFF;
+        border-left: 5px solid #E61A8D;
+        border-radius: 10px;
+        padding: 14px 18px;
+        box-shadow: 0 2px 10px rgba(230, 26, 141, 0.08);
+    }}
+    div[data-testid="stMetricValue"] {{
+        color: #C2185B !important;
+        font-weight: 800 !important;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -127,7 +170,7 @@ def render_banner(title="BRS MLC GRADUATE VOTER CONSOLE", sub="Warangal – Kham
     </div>
     """, unsafe_allow_html=True)
 
-# --- LOCAL DATABASE SETUP ---
+# --- DATABASE SETUP ---
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -319,12 +362,19 @@ if "logged_in" not in st.session_state:
     st.session_state.full_name = None
 
 # ==============================================================================
-# LOGIN / REGISTRATION SCREEN
+# LOGIN SCREEN (LOGO ON LEFT, FORM ON RIGHT)
 # ==============================================================================
 if not st.session_state.logged_in:
     render_banner()
 
-    _, col_form, _ = st.columns([1, 1.6, 1])
+    col_brand, col_form = st.columns([1.1, 1.2], gap="large")
+
+    with col_brand:
+        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
+        st.markdown("### 🌸 భారత రాష్ట్ర సమితి (BRS)")
+        st.markdown("#### **War Room Graduate Voter Console**")
+        st.caption("Warangal – Khammam – Nalgonda Graduate MLC Constituency")
+        st.info("📌 **Welcome to the Central Voter Intake Portal.**\n\nAuthorized War Room Operators and Volunteers can log in to upload CEO Telangana Form-18 verification slips and synchronize voter records directly to the constituency database.")
 
     with col_form:
         tab1, tab2 = st.tabs(["🔑 War Room Sign In", "📝 Volunteer Registration"])
@@ -485,7 +535,7 @@ with main_tab1:
 
                             if app_id in existing_ids:
                                 log_duplicate(app_id, name, st.session_state.username)
-                                st.warning(f"⚠️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
+                                st.warning(f"⚠️️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
                             else:
                                 new_entry = [
                                     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
