@@ -7,7 +7,6 @@ import sqlite3
 import hashlib
 import re
 import os
-import base64
 from datetime import datetime
 
 st.set_page_config(
@@ -17,123 +16,77 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- BANNER IMAGE BASE64 ENCODER ---
-def get_banner_base64():
+# Locate the poster image in the repository
+def get_banner_image():
     for filename in ["brs_banner_bg.png", "1461945.png", "brs_banner_bg.jpg", "brs_logo.webp", "brs_logo.jpg"]:
         if os.path.exists(filename):
-            ext = filename.split(".")[-1]
-            mime = "image/png" if ext == "png" else ("image/webp" if ext == "webp" else "image/jpeg")
-            with open(filename, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode()
-                return f"data:{mime};base64,{b64}"
-    return ""
+            return filename
+    return None
 
-banner_data_uri = get_banner_base64()
+banner_img_path = get_banner_image()
 
-# Header banner styling using the uploaded image
-banner_bg_style = ""
-if banner_data_uri:
-    banner_bg_style = f"""
-        background: linear-gradient(rgba(194, 24, 91, 0.40), rgba(136, 14, 79, 0.70)), 
-                    url("{banner_data_uri}") center center / cover no-repeat !important;
-    """
-else:
-    banner_bg_style = """
-        background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%) !important;
-    """
-
-# --- CSS STYLING: HIGH-CONTRAST HIGHLIGHTED INPUTS ---
-st.markdown(f"""
+# Clean BRS Styling
+st.markdown("""
 <style>
-    /* Clean, soft blush background without distracting page-wide clutter */
-    .stApp {{
-        background: linear-gradient(180deg, #FFF0F6 0%, #FFFFFF 60%, #FFF5F9 100%) !important;
+    /* Clean base page background */
+    .stApp {
+        background: linear-gradient(180deg, #FFF0F6 0%, #FFFFFF 50%, #FFEBF2 100%) !important;
         color: #1E293B;
-    }}
+    }
 
-    /* Main container padding */
-    .main .block-container {{
-        max-width: 1180px;
-        padding-top: 1.2rem;
+    /* Page container width */
+    .main .block-container {
+        max-width: 1100px;
+        padding-top: 1rem;
         padding-bottom: 2.5rem;
-    }}
+    }
 
-    /* Top Hero Banner matching the BRS image */
-    .brs-hero-banner {{
-        {banner_bg_style}
-        min-height: 160px;
+    /* Styled Poster Wrapper with glow and rounded corners */
+    .banner-container {
         border-radius: 18px;
-        padding: 24px 30px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        box-shadow: 0 10px 25px rgba(230, 26, 141, 0.25);
-        margin-bottom: 24px;
-        border: 2px solid rgba(255, 255, 255, 0.4);
-    }}
-    .brs-hero-banner h1 {{
-        color: #FFFFFF !important;
-        font-size: 28px !important;
-        font-weight: 900 !important;
-        margin: 0 !important;
-        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
-        letter-spacing: 0.5px;
-    }}
-    .brs-hero-banner p {{
-        color: #FFF0F5 !important;
-        font-size: 15px !important;
-        font-weight: 600 !important;
-        margin: 6px 0 0 0 !important;
-        text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
-    }}
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(230, 26, 141, 0.22);
+        margin-bottom: 22px;
+        border: 2px solid #F8BBD0;
+    }
 
-    /* Highlighted Sign-In Card Container */
-    .highlight-card {{
-        background: #FFFFFF !important;
-        border-radius: 18px !important;
-        padding: 30px 28px !important;
-        box-shadow: 0 14px 35px rgba(230, 26, 141, 0.18), 0 2px 8px rgba(0,0,0,0.04) !important;
-        border: 2px solid #F8BBD0 !important;
-    }}
-
-    /* Form Container */
-    [data-testid="stForm"] {{
+    /* Card Forms */
+    [data-testid="stForm"] {
         background: #FFFFFF !important;
         border: 2px solid #F8BBD0 !important;
         border-radius: 16px !important;
         padding: 26px 24px !important;
-        box-shadow: 0 10px 30px rgba(230, 26, 141, 0.12) !important;
-    }}
+        box-shadow: 0 10px 28px rgba(230, 26, 141, 0.12) !important;
+    }
 
-    /* Highlighted Input Labels */
-    label[data-testid="stWidgetLabel"] p {{
-        font-size: 14.5px !important;
+    /* Input Field Labels */
+    label[data-testid="stWidgetLabel"] p {
+        font-size: 15px !important;
         font-weight: 700 !important;
         color: #880E4F !important;
         margin-bottom: 4px !important;
-    }}
+    }
 
-    /* Highlighted Input Boxes */
-    .stTextInput input {{
+    /* Input Boxes */
+    .stTextInput input {
         background-color: #FFF9FB !important;
         border: 2px solid #F48FB1 !important;
         border-radius: 10px !important;
         color: #0F172A !important;
         font-size: 15px !important;
         font-weight: 600 !important;
-        padding: 11px 15px !important;
-        box-shadow: inset 0 2px 4px rgba(230, 26, 141, 0.05) !important;
+        padding: 10px 14px !important;
         transition: all 0.2s ease-in-out !important;
-    }}
-    .stTextInput input:focus {{
+    }
+    .stTextInput input:focus {
         background-color: #FFFFFF !important;
         border-color: #E61A8D !important;
         box-shadow: 0 0 0 3px rgba(230, 26, 141, 0.25) !important;
-    }}
+    }
 
-    /* Highlighted Sign In to Console Button */
-    div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {{
-        background: linear-gradient(90deg, #E61A8D 0%, #C2185B 100%) !important;
+    /* Submit Button */
+    div.stButton > button:first-child, div.stFormSubmitButton > button:first-child {
+        background: linear-gradient(90deg, #E61A8D 0%, #D81B60 100%) !important;
         color: #FFFFFF !important;
         font-size: 16px !important;
         font-weight: 800 !important;
@@ -141,72 +94,71 @@ st.markdown(f"""
         border-radius: 10px !important;
         border: none !important;
         padding: 12px 24px !important;
-        box-shadow: 0 6px 18px rgba(230, 26, 141, 0.40) !important;
-        transition: all 0.2s ease-in-out !important;
+        box-shadow: 0 6px 18px rgba(230, 26, 141, 0.38) !important;
         margin-top: 10px !important;
-    }}
-    div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {{
+        transition: all 0.2s ease-in-out !important;
+    }
+    div.stButton > button:first-child:hover, div.stFormSubmitButton > button:first-child:hover {
         background: linear-gradient(90deg, #C2185B 0%, #880E4F 100%) !important;
-        box-shadow: 0 8px 24px rgba(230, 26, 141, 0.55) !important;
+        box-shadow: 0 8px 24px rgba(230, 26, 141, 0.50) !important;
         transform: translateY(-2px);
-    }}
+    }
 
     /* Tabs Styling */
-    button[data-baseweb="tab"] {{
+    button[data-baseweb="tab"] {
         font-weight: 700 !important;
         font-size: 15px !important;
         color: #64748B !important;
-        padding: 10px 18px !important;
-    }}
-    button[data-baseweb="tab"][aria-selected="true"] {{
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
         color: #E61A8D !important;
         border-bottom: 3px solid #E61A8D !important;
         font-weight: 800 !important;
-    }}
+    }
 
-    /* Information Card Below Form */
-    .portal-info-box {{
-        background: linear-gradient(135deg, #FFFFFF 0%, #FFF5F9 100%);
+    /* Portal Information Box */
+    .portal-info-box {
+        background: #FFFFFF;
         border-left: 5px solid #E61A8D;
         border-radius: 12px;
-        padding: 18px 22px;
-        margin-top: 20px;
-        box-shadow: 0 4px 16px rgba(230, 26, 141, 0.10);
+        padding: 16px 20px;
+        margin-top: 18px;
+        box-shadow: 0 4px 16px rgba(230, 26, 141, 0.08);
         border-top: 1px solid #FCE4EC;
         border-right: 1px solid #FCE4EC;
         border-bottom: 1px solid #FCE4EC;
-    }}
-    .portal-info-box h4 {{
+    }
+    .portal-info-box h4 {
         color: #AD1457 !important;
         font-size: 16px !important;
         font-weight: 800 !important;
         margin: 0 0 6px 0 !important;
-    }}
-    .portal-info-box p {{
+    }
+    .portal-info-box p {
         color: #334155 !important;
         font-size: 13.5px !important;
-        line-height: 1.55 !important;
+        line-height: 1.5 !important;
         margin: 0 !important;
-    }}
+    }
 
     /* Sidebar Styling */
-    section[data-testid="stSidebar"] {{
+    section[data-testid="stSidebar"] {
         background-color: #FFF7FA !important;
         border-right: 1.5px solid #F8BBD0 !important;
-    }}
+    }
 
     /* KPI Metrics Cards */
-    div[data-testid="stMetric"] {{
+    div[data-testid="stMetric"] {
         background: #FFFFFF;
         border-left: 5px solid #E61A8D;
         border-radius: 12px;
         padding: 16px 20px;
         box-shadow: 0 4px 16px rgba(230, 26, 141, 0.10);
-    }}
-    div[data-testid="stMetricValue"] {{
+    }
+    div[data-testid="stMetricValue"] {
         color: #C2185B !important;
         font-weight: 800 !important;
-    }}
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -220,13 +172,9 @@ HEADERS = [
     "Reference Name", "Mobile Number", "Remarks", "Operator Username"
 ]
 
-def render_banner(title="BRS MLC GRADUATE VOTER CONSOLE", sub="Warangal – Khammam – Nalgonda Graduate Constituency | War Room Portal (కారు గుర్తుకే మన ఓటు)"):
-    st.markdown(f"""
-    <div class="brs-hero-banner">
-        <h1>🚗 {title}</h1>
-        <p>{sub}</p>
-    </div>
-    """, unsafe_allow_html=True)
+def render_top_poster():
+    if banner_img_path:
+        st.image(banner_img_path, use_container_width=True)
 
 # --- DATABASE SETUP ---
 def init_db():
@@ -420,10 +368,11 @@ if "logged_in" not in st.session_state:
     st.session_state.full_name = None
 
 # ==============================================================================
-# HIGHLIGHTED SIGN IN / REGISTRATION INTERFACE
+# AUTH SCREEN: POSTER AT THE TOP, CRISP LOGIN CARD CENTERED BELOW
 # ==============================================================================
 if not st.session_state.logged_in:
-    render_banner()
+    # Full poster rendered in its complete aspect ratio without distortion
+    render_top_poster()
 
     _, col_form, _ = st.columns([1, 1.8, 1])
 
@@ -472,7 +421,7 @@ if not st.session_state.logged_in:
             <p><strong>Warangal – Khammam – Nalgonda Graduate MLC Constituency</strong></p>
             <p style="margin-top: 6px; color: #475569;">
                 📌 <strong>Central Voter Consolidation Desk:</strong><br>
-                Authorized War Room operators and volunteers can upload Form-18 slips to parse, verify duplicates, and automatically synchronize voter records with Google Sheets.
+                Authorized operators and volunteers can upload Form-18 slips to verify duplicates and sync voter records directly with Google Sheets.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -516,7 +465,7 @@ with st.sidebar:
         else:
             st.caption("No pending registrations.")
 
-render_banner("BRS MLC GRADUATE VOTER CONSOLE", "Consolidating Form-18 Applications | Warangal – Khammam – Nalgonda (కారు గుర్తుకే మన ఓటు)")
+render_top_poster()
 
 if st.session_state.role == "Admin":
     main_tab1, main_tab2 = st.tabs(["📥 Data Ingestion & Form-18 Processing", "📊 War Room Analytics & Mandal Breakdown"])
