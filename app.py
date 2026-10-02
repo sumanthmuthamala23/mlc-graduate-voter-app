@@ -280,15 +280,42 @@ def get_worksheet():
     except Exception as e:
         return None, str(e)
 
-# API Key Finder
-def get_gemini_key():
-    if "GEMINI_API_KEY" in st.secrets:
-        return st.secrets["GEMINI_API_KEY"]
-    if "gemini_api_key" in st.secrets:
-        return st.secrets["gemini_api_key"]
-    if os.environ.get("GEMINI_API_KEY"):
-        return os.environ.get("GEMINI_API_KEY")
-    return st.session_state.get("custom_gemini_key", "")
+# Multi-Key Rotation Pool Retriever
+def get_configured_api_keys():
+    keys = []
+    # 1. Manual user override from session
+    if st.session_state.get("custom_gemini_key", "").strip():
+        keys.append(st.session_state["custom_gemini_key"].strip())
+
+    # 2. Streamlit Cloud Secrets (List or String)
+    try:
+        if "GEMINI_API_KEYS" in st.secrets:
+            val = st.secrets["GEMINI_API_KEYS"]
+            if isinstance(val, list):
+                keys.extend([str(k).strip() for k in val if str(k).strip()])
+            elif isinstance(val, str):
+                cleaned = val.replace('"', '').replace("'", "").replace('[', '').replace(']', '')
+                for piece in cleaned.split(","):
+                    if piece.strip():
+                        keys.append(piece.strip())
+        elif "GEMINI_API_KEY" in st.secrets:
+            keys.append(str(st.secrets["GEMINI_API_KEY"]).strip())
+    except Exception:
+        pass
+
+    # 3. Environment variables
+    for env_k in ["GEMINI_API_KEY", "GOOGLE_API_KEY"]:
+        if os.environ.get(env_k):
+            keys.append(os.environ[env_k].strip())
+
+    # Deduplicate while preserving order
+    seen = set()
+    deduped = []
+    for k in keys:
+        if len(k) > 15 and k not in seen:
+            seen.add(k)
+            deduped.append(k)
+    return deduped
 
 # Engine 1: Pure Offline PDF Text Extraction
 def parse_acknowledgement_pdf(file_bytes):
@@ -354,19 +381,20 @@ def parse_acknowledgement_pdf(file_bytes):
     except Exception:
         return {}
 
-# Engine 2: AI Multimodal Vision (For JPG, PNG, WEBP & Scanned PDF Slips)
-def parse_with_vision(file_bytes, mime_type, api_key):
-    models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
-    b64_data = base64.b64encode(file_bytes).decode('utf-8')
+# Engine 2: AI Multimodal Vision with Multi-Key Failover
+def parse_with_vision_pool(file_bytes, mime_type, api_keys):
+    if not api_keys:
+        return {}
 
-    prompt_text = """Analyze this Form-18 acknowledgement receipt/voter slip image and extract these exact fields as JSON:
+    b64_data = base64.b64encode(file_bytes).decode('utf-8')
+    prompt_text = """Analyze this Form-18 acknowledgement voter slip image and extract these exact fields as JSON:
 {
-  "application_id": "Application ID or slip number (e.g., F180928310521426)",
+  "application_id": "Application ID or slip number (e.g. F180928310521426)",
   "applicant_name": "Applicant Name",
   "gender": "Male or Female",
   "relation_name": "Father or Husband or Relation Name",
   "house_number": "House Number",
-  "mlc_constituency": "Constituency Name (e.g. Warangal-Khammam-Nalgonda)",
+  "mlc_constituency": "Constituency Name",
   "district_name": "District Name",
   "current_status": "Status if visible"
 }
@@ -382,30 +410,37 @@ Return raw JSON only."""
         "generationConfig": {"response_mime_type": "application/json"}
     }
 
-    for model in models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        try:
-            res = requests.post(url, json=payload, timeout=25)
-            if res.status_code == 200:
-                body = res.json()
-                text_content = body["candidates"][0]["content"]["parts"][0]["text"]
-                return json.loads(text_content)
-        except Exception:
-            continue
+    models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+
+    for key_idx, key in enumerate(api_keys):
+        for model in models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+            try:
+                res = requests.post(url, json=payload, timeout=25)
+                if res.status_code == 200:
+                    body = res.json()
+                    text_content = body["candidates"][0]["content"]["parts"][0]["text"]
+                    return json.loads(text_content)
+                elif res.status_code in [429, 401, 403]:
+                    # Quota or auth issue with this key, break inner loop to try next key in pool
+                    break
+            except Exception:
+                continue
+
     return {}
 
-# Universal Router: Handles PDF, JPG, JPEG, PNG, WEBP
-def extract_universal_document(uploaded_file, api_key):
+# Universal Document Router
+def extract_universal_document(uploaded_file, api_keys):
     filename = uploaded_file.name.lower()
     file_bytes = uploaded_file.getvalue()
 
-    # Step 1: If it's a PDF, test offline digital text extraction first
+    # 1. Digital PDF extraction (Instant, offline, zero quota used)
     if filename.endswith(".pdf"):
         data = parse_acknowledgement_pdf(file_bytes)
         if data.get("application_id") or data.get("applicant_name"):
             return data, "Offline PDF Engine"
 
-    # Step 2: If file is an image (JPG/PNG/WEBP) or scanned PDF, use Vision Engine
+    # 2. Photos/Images (JPG/PNG/WEBP) or Scanned PDFs via Vision Pool
     mime_type = "application/pdf"
     if filename.endswith((".jpg", ".jpeg")):
         mime_type = "image/jpeg"
@@ -414,8 +449,8 @@ def extract_universal_document(uploaded_file, api_key):
     elif filename.endswith(".webp"):
         mime_type = "image/webp"
 
-    if api_key:
-        vision_data = parse_with_vision(file_bytes, mime_type, api_key)
+    if api_keys:
+        vision_data = parse_with_vision_pool(file_bytes, mime_type, api_keys)
         if vision_data.get("application_id") or vision_data.get("applicant_name"):
             return vision_data, "AI Vision Engine"
         return {}, "Vision Error"
@@ -527,7 +562,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # Workspace
-active_api_key = get_gemini_key()
+configured_keys = get_configured_api_keys()
 
 with st.sidebar:
     st.markdown("""
@@ -538,16 +573,17 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     st.markdown(f"**Operator:** {st.session_state.full_name}")
     st.markdown(f"**Role:** `{st.session_state.role}`")
+    st.caption(f"🔑 Active OCR Engines Loaded: **{len(configured_keys)} Keys**")
     if st.button("Log Out", use_container_width=True):
         st.session_state.logged_in = False
         st.rerun()
     st.divider()
 
-    with st.expander("⚙️ Photo / Image Scanner Settings"):
-        custom_k = st.text_input("Gemini API Key (Optional)", type="password", value=st.session_state.get("custom_gemini_key", ""), help="Digital PDFs extract 100% automatically without any key. Only required for phone camera snaps or JPG/PNG files.")
+    with st.expander("⚙️ Backup API Key"):
+        custom_k = st.text_input("Temporary Backup Key", type="password", value=st.session_state.get("custom_gemini_key", ""))
         if custom_k:
             st.session_state["custom_gemini_key"] = custom_k
-            active_api_key = custom_k
+            configured_keys = get_configured_api_keys()
 
     if st.session_state.role == "Admin":
         st.subheader("👥 Volunteer Approvals")
@@ -592,10 +628,9 @@ with main_tab1:
             current_bytes = uploaded_doc.getvalue()
             current_hash = hashlib.md5(current_bytes).hexdigest()
 
-            # Hash-based change detection guarantees every file triggers extraction
             if st.session_state["last_file_hash"] != current_hash:
                 with st.spinner("⚡ Extracting voter details from document..."):
-                    extracted_info, engine_used = extract_universal_document(uploaded_doc, active_api_key)
+                    extracted_info, engine_used = extract_universal_document(uploaded_doc, configured_keys)
 
                     if extracted_info.get("application_id") or extracted_info.get("applicant_name"):
                         st.session_state["field_app_id"] = extracted_info.get("application_id", "")
@@ -610,7 +645,7 @@ with main_tab1:
                         st.session_state["last_engine"] = engine_used
                         st.rerun()
                     elif engine_used == "Needs API Key":
-                        st.warning("📸 For photo/camera images (JPG/PNG), please add a free Gemini API Key in the left sidebar or upload the original digital PDF.")
+                        st.warning("📸 For photo/camera images, please configure GEMINI_API_KEYS in Streamlit Secrets.")
                     else:
                         st.error("Could not automatically parse text. Please ensure the document is clear or enter the details manually.")
 
