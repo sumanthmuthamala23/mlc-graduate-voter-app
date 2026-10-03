@@ -15,7 +15,7 @@ import requests
 import urllib.parse
 from datetime import datetime
 
-# Fallback local OCR engine
+# Local OCR fallback
 try:
     import pytesseract
     HAS_PYTESSERACT = True
@@ -29,7 +29,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Locate poster image if available
 def get_banner_image():
     for filename in ["brs_banner_bg.png", "1461945.png", "brs_banner_bg.jpg", "brs_logo.webp", "brs_logo.jpg"]:
         if os.path.exists(filename):
@@ -38,7 +37,7 @@ def get_banner_image():
 
 banner_img_path = get_banner_image()
 
-# BRS Styling
+# BRS Party Theme Styling
 st.markdown("""
 <style>
     .stApp {
@@ -234,6 +233,21 @@ def init_db():
     conn.close()
 
 init_db()
+
+# Safe Pre-Widget Session Cleanup
+if st.session_state.get("clear_form_trigger", False):
+    st.session_state["inp_app_id"] = ""
+    st.session_state["inp_name"] = ""
+    st.session_state["inp_gender"] = ""
+    st.session_state["inp_relation"] = ""
+    st.session_state["inp_house_no"] = ""
+    st.session_state["inp_status"] = "Submitted"
+    st.session_state["inp_ref_name"] = ""
+    st.session_state["inp_mobile_no"] = ""
+    st.session_state["inp_remarks"] = ""
+    st.session_state["custom_village_input"] = ""
+    st.session_state["last_file_hash"] = ""
+    st.session_state["clear_form_trigger"] = False
 
 # ==============================================================================
 # OFFICIAL TELANGANA REVENUE JURISDICTION HIERARCHY
@@ -790,7 +804,8 @@ widget_keys = {
     "last_file_hash": "",
     "lens_detected_raw": "",
     "last_engine": "",
-    "last_saved_voter": None
+    "last_saved_voter": None,
+    "clear_form_trigger": False
 }
 
 for k, default_val in widget_keys.items():
@@ -1044,7 +1059,6 @@ with main_tab1:
         ref_name = r1.text_input("Party Reference / Cadre Name", placeholder="Mandal Incharge / Cadre Name", key="inp_ref_name")
         mobile_no = r2.text_input("Voter Mobile Number", placeholder="10-digit mobile number", key="inp_mobile_no")
         
-        # Phone Number Real-Time Validation
         clean_mobile = re.sub(r'[^0-9]', '', mobile_no.strip())
         is_mobile_valid = True
         if clean_mobile:
@@ -1092,7 +1106,7 @@ with main_tab1:
             else:
                 if check_duplicate_local(app_id):
                     log_duplicate(app_id, name, st.session_state.username)
-                    st.warning(f"⚠️️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
+                    st.warning(f"⚠️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
                 else:
                     ws, err = get_worksheet()
                     if ws is None:
@@ -1109,7 +1123,6 @@ with main_tab1:
                             ws.append_row(new_entry)
                             record_local_entry(app_id, name)
                             
-                            # Cache for 1-click WhatsApp messaging
                             st.session_state["last_saved_voter"] = {
                                 "name": name,
                                 "app_id": app_id,
@@ -1119,18 +1132,8 @@ with main_tab1:
 
                             st.success(f"🎉 Successfully Ingested: {name} ({app_id}) to BRS Central Records!")
                             
-                            # Clean reset for next voter slip
-                            st.session_state["inp_app_id"] = ""
-                            st.session_state["inp_name"] = ""
-                            st.session_state["inp_gender"] = ""
-                            st.session_state["inp_relation"] = ""
-                            st.session_state["inp_house_no"] = ""
-                            st.session_state["inp_status"] = "Submitted"
-                            st.session_state["inp_ref_name"] = ""
-                            st.session_state["inp_mobile_no"] = ""
-                            st.session_state["inp_remarks"] = ""
-                            st.session_state["custom_village_input"] = ""
-                            st.session_state["last_file_hash"] = ""
+                            # Safe deferred reset trigger
+                            st.session_state["clear_form_trigger"] = True
                             st.rerun()
                         except Exception as ex:
                             st.error(f"Error appending row: {ex}")
@@ -1170,7 +1173,6 @@ if st.session_state.role == "Admin":
                     m4.metric("Duplicates Filtered", f"{duplicate_attempts:,}")
                     m5.metric("Active War Room Cadre", f"{active_operators}")
 
-                    # 📥 Instant One-Click CSV Export Button
                     st.write("")
                     csv_bytes = df.to_csv(index=False).encode('utf-8')
                     st.download_button(
@@ -1183,7 +1185,6 @@ if st.session_state.role == "Admin":
 
                     st.divider()
 
-                    # 🏆 Cadre & Volunteer Performance Leaderboard
                     lead_col1, lead_col2 = st.columns(2)
                     
                     with lead_col1:
