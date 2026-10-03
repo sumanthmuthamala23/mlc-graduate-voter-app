@@ -84,12 +84,13 @@ st.markdown("""
         margin: 2px 0 0 0;
     }
 
-    [data-testid="stForm"] {
+    .voter-card-container {
         background: #FFFFFF !important;
         border: 2px solid #F8BBD0 !important;
         border-radius: 16px !important;
         padding: 24px 22px !important;
         box-shadow: 0 10px 28px rgba(230, 26, 141, 0.10) !important;
+        margin-bottom: 20px;
     }
 
     label[data-testid="stWidgetLabel"] p {
@@ -436,8 +437,9 @@ JURISDICTION_DATA = {
     }
 }
 
-# Google Sheets Connector
-def get_worksheet():
+# High-Speed Cached Google Sheets Connector
+@st.cache_resource(ttl=300)
+def get_cached_worksheet():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds = None
     if "gcp_service_account" in st.secrets:
@@ -450,25 +452,20 @@ def get_worksheet():
     try:
         gc = gspread.authorize(creds)
         sh = gc.open_by_key(SHEET_ID).sheet1
-        rows = sh.get_all_values()
-        if not rows or rows[0] != HEADERS:
-            if not rows:
-                sh.append_row(HEADERS)
-            else:
-                sh.insert_row(HEADERS, index=1)
         return sh, None
     except Exception as e:
         return None, str(e)
+
+def get_worksheet():
+    return get_cached_worksheet()
 
 # Multi-Key Rotation Pool Retriever (Safe Secrets + Env + Session storage)
 def get_configured_api_keys():
     keys = []
 
-    # 1. User session override from sidebar
     if st.session_state.get("custom_gemini_key", "").strip():
         keys.append(st.session_state["custom_gemini_key"].strip())
 
-    # 2. Streamlit Cloud Secrets (Safely parsed)
     try:
         if "GEMINI_API_KEYS" in st.secrets:
             val = st.secrets["GEMINI_API_KEYS"]
@@ -484,12 +481,10 @@ def get_configured_api_keys():
     except Exception:
         pass
 
-    # 3. Environment Variables
     for env_k in ["GEMINI_API_KEY", "GOOGLE_API_KEY"]:
         if os.environ.get(env_k):
             keys.append(os.environ[env_k].strip())
 
-    # Deduplicate while preserving order
     seen = set()
     deduped = []
     for k in keys:
@@ -713,16 +708,13 @@ def parse_with_offline_ocr(file_bytes):
 def extract_universal_document(uploaded_file, file_bytes, api_keys):
     filename = uploaded_file.name.lower() if hasattr(uploaded_file, 'name') else "image.jpg"
 
-    # 1. Standard Digital PDF
     if filename.endswith(".pdf"):
         data, raw_txt = parse_acknowledgement_pdf(file_bytes)
         if data.get("application_id") or data.get("applicant_name"):
             return data, raw_txt, "PDF Text Engine", ""
 
-    # 2. Enhance image
     enhanced_bytes, mime_type = enhance_image_for_ocr(file_bytes)
 
-    # 3. Google Lens AI Vision
     lens_data, raw_txt, err_detail = parse_with_google_lens(enhanced_bytes, mime_type, api_keys)
     if lens_data.get("application_id") or lens_data.get("applicant_name"):
         return lens_data, raw_txt, "Google Lens AI (Enhanced)", ""
@@ -731,7 +723,6 @@ def extract_universal_document(uploaded_file, file_bytes, api_keys):
     if lens_data2.get("application_id") or lens_data2.get("applicant_name"):
         return lens_data2, raw_txt2, "Google Lens AI Module", ""
 
-    # 4. Offline Tesseract OCR Fallback
     tess_data, tess_txt, tess_err = parse_with_offline_ocr(enhanced_bytes)
     if tess_data.get("application_id") or tess_data.get("applicant_name"):
         return tess_data, tess_txt, "Offline Tesseract OCR", ""
@@ -962,86 +953,107 @@ with main_tab1:
     with data_col:
         st.markdown("#### 2. Review & Tag Jurisdiction Details")
 
-        with st.form("voter_entry_form"):
-            st.markdown("##### 👤 Applicant Information")
-            c1, c2 = st.columns(2)
-            app_id = c1.text_input("Application ID", value=st.session_state["field_app_id"])
-            name = c2.text_input("Applicant Name", value=st.session_state["field_applicant_name"])
+        st.markdown('<div class="voter-card-container">', unsafe_allow_html=True)
+        st.markdown("##### 👤 Applicant Information")
+        c1, c2 = st.columns(2)
+        app_id = c1.text_input("Application ID", value=st.session_state["field_app_id"], key="inp_app_id")
+        name = c2.text_input("Applicant Name", value=st.session_state["field_applicant_name"], key="inp_name")
 
-            c3, c4, c5 = st.columns(3)
-            gender = c3.text_input("Gender", value=st.session_state["field_gender"])
-            relation = c4.text_input("Relation Name", value=st.session_state["field_relation_name"])
-            house_no = c5.text_input("House Number", value=st.session_state["field_house_no"])
+        c3, c4, c5 = st.columns(3)
+        gender = c3.text_input("Gender", value=st.session_state["field_gender"], key="inp_gender")
+        relation = c4.text_input("Relation Name", value=st.session_state["field_relation_name"], key="inp_relation")
+        house_no = c5.text_input("House Number", value=st.session_state["field_house_no"], key="inp_house_no")
 
-            c6, c7 = st.columns(2)
-            mlc_const = c6.text_input("Constituency", value=st.session_state["field_constituency"] or "Warangal-Khammam-Nalgonda")
-            status = c7.text_input("Status", value=st.session_state["field_ack_status"])
+        c6, c7 = st.columns(2)
+        mlc_const = c6.text_input("Constituency", value=st.session_state["field_constituency"] or "Warangal-Khammam-Nalgonda", key="inp_mlc")
+        status = c7.text_input("Status", value=st.session_state["field_ack_status"], key="inp_status")
 
-            st.markdown("---")
-            st.markdown("##### 📍 Tag Jurisdiction (MLC Limits)")
-            
-            all_districts = list(JURISDICTION_DATA.keys())
-            
-            default_dist_idx = 0
-            detected_district = st.session_state["field_ack_district"].strip().lower()
-            for idx, d_name in enumerate(all_districts):
-                if d_name.lower() in detected_district or detected_district in d_name.lower():
-                    default_dist_idx = idx
-                    break
+        st.markdown("---")
+        st.markdown("##### 📍 Tag Jurisdiction (Instant Sync)")
+        
+        all_districts = list(JURISDICTION_DATA.keys())
+        
+        default_dist_idx = 0
+        detected_district = st.session_state["field_ack_district"].strip().lower()
+        for idx, d_name in enumerate(all_districts):
+            if d_name.lower() in detected_district or detected_district in d_name.lower():
+                default_dist_idx = idx
+                break
 
-            selected_district = st.selectbox("Select District", all_districts, index=default_dist_idx)
-            available_mandals = sorted(list(JURISDICTION_DATA[selected_district].keys()))
-            selected_mandal = st.selectbox("Select Mandal", available_mandals)
-            
-            available_villages = sorted(JURISDICTION_DATA[selected_district][selected_mandal]) + ["Other / Enter Manually"]
-            selected_village = st.selectbox("Select Revenue Village / Ward", available_villages)
-            
-            if selected_village == "Other / Enter Manually":
-                final_village = st.text_input("Enter Revenue Village / Ward / Colony Name", placeholder="Type village or ward name")
+        # Instant reactive district selection
+        selected_district = st.selectbox(
+            "Select District", 
+            all_districts, 
+            index=default_dist_idx, 
+            key="jurisdiction_district_select"
+        )
+        
+        available_mandals = sorted(list(JURISDICTION_DATA[selected_district].keys()))
+        
+        # Instant reactive mandal selection
+        selected_mandal = st.selectbox(
+            "Select Mandal", 
+            available_mandals, 
+            key=f"jurisdiction_mandal_select_{selected_district}"
+        )
+        
+        # Instant reactive village list based on current mandal
+        village_options = sorted(JURISDICTION_DATA[selected_district][selected_mandal]) + ["Other / Enter Manually"]
+        
+        selected_village = st.selectbox(
+            "Select Revenue Village / Ward", 
+            village_options, 
+            key=f"jurisdiction_village_select_{selected_district}_{selected_mandal}"
+        )
+        
+        if selected_village == "Other / Enter Manually":
+            final_village = st.text_input("Enter Revenue Village / Ward / Colony Name", placeholder="Type village or ward name", key="custom_village_input")
+        else:
+            final_village = selected_village
+
+        st.markdown("---")
+        st.markdown("##### 🤝 Party Volunteer & Reference Details")
+        r1, r2 = st.columns(2)
+        ref_name = r1.text_input("Party Reference / Cadre Name", value="", placeholder="Mandal Incharge / Cadre Name", key="inp_ref_name")
+        mobile_no = r2.text_input("Voter Mobile Number", placeholder="10-digit mobile number", key="inp_mobile_no")
+        remarks = st.text_area("Remarks / Notes", placeholder="e.g., Form-18 acknowledged, Degree certificate verified, Mobile confirmed", key="inp_remarks")
+
+        save_btn = st.button("🚗 Save & Submit to BRS Voter Database", use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        if save_btn:
+            if not app_id or not name:
+                st.error("Application ID and Applicant Name are mandatory.")
             else:
-                final_village = selected_village
-
-            st.markdown("---")
-            st.markdown("##### 🤝 Party Volunteer & Reference Details")
-            r1, r2 = st.columns(2)
-            ref_name = r1.text_input("Party Reference / Cadre Name", value="", placeholder="Mandal Incharge / Cadre Name")
-            mobile_no = r2.text_input("Voter Mobile Number", placeholder="10-digit mobile number")
-            remarks = st.text_area("Remarks / Notes", placeholder="e.g., Form-18 acknowledged, Degree certificate verified, Mobile confirmed")
-
-            save_btn = st.form_submit_button("🚗 Save & Submit to BRS Voter Database", use_container_width=True)
-
-            if save_btn:
-                if not app_id or not name:
-                    st.error("Application ID and Applicant Name are mandatory.")
+                ws, err = get_worksheet()
+                if ws is None:
+                    st.error(f"Database Connection Failed: {err}")
                 else:
-                    ws, err = get_worksheet()
-                    if ws is None:
-                        st.error(f"Database Connection Failed: {err}")
-                    else:
-                        try:
-                            rows = ws.get_all_values()
-                            header_row = rows[0] if rows else HEADERS
-                            idx = header_row.index("Application ID") if "Application ID" in header_row else 1
-                            existing_ids = [r[idx] for r in rows[1:] if len(r) > idx]
+                    try:
+                        rows = ws.get_all_values()
+                        header_row = rows[0] if rows else HEADERS
+                        idx = header_row.index("Application ID") if "Application ID" in header_row else 1
+                        existing_ids = [r[idx] for r in rows[1:] if len(r) > idx]
 
-                            if app_id in existing_ids:
-                                log_duplicate(app_id, name, st.session_state.username)
-                                st.warning(f"⚠️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
-                            else:
-                                new_entry = [
-                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                    app_id, name, gender, relation, house_no,
-                                    mlc_const, st.session_state["field_ack_district"], status,
-                                    selected_district, selected_mandal, final_village,
-                                    ref_name, mobile_no, remarks, st.session_state.username
-                                ]
-                                ws.append_row(new_entry)
-                                st.success(f"🎉 Successfully Ingested: {name} ({app_id}) to BRS Central Records!")
-                                
-                                for f in form_fields:
-                                    st.session_state[f] = ""
-                        except Exception as ex:
-                            st.error(f"Error appending row: {ex}")
+                        if app_id in existing_ids:
+                            log_duplicate(app_id, name, st.session_state.username)
+                            st.warning(f"⚠️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
+                        else:
+                            new_entry = [
+                                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                app_id, name, gender, relation, house_no,
+                                mlc_const, st.session_state["field_ack_district"], status,
+                                selected_district, selected_mandal, final_village,
+                                ref_name, mobile_no, remarks, st.session_state.username
+                            ]
+                            ws.append_row(new_entry)
+                            st.success(f"🎉 Successfully Ingested: {name} ({app_id}) to BRS Central Records!")
+                            
+                            for f in form_fields:
+                                st.session_state[f] = ""
+                            st.rerun()
+                    except Exception as ex:
+                        st.error(f"Error appending row: {ex}")
 
 # TAB 2: WAR ROOM ANALYTICS
 if st.session_state.role == "Admin":
