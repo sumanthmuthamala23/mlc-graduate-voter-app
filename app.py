@@ -14,7 +14,7 @@ import base64
 import requests
 from datetime import datetime
 
-# Optional local OCR engine fallback
+# Fallback local OCR engine
 try:
     import pytesseract
     HAS_PYTESSERACT = True
@@ -46,7 +46,7 @@ st.markdown("""
     }
 
     .main .block-container {
-        max-width: 1180px;
+        max-width: 1200px;
         padding-top: 1rem;
         padding-bottom: 2.5rem;
     }
@@ -220,80 +220,219 @@ def init_db():
 
 init_db()
 
-# Jurisdiction Hierarchy
+# ==============================================================================
+# OFFICIAL TELANGANA REVENUE JURISDICTION HIERARCHY
+# Erstwhile Khammam, Warangal, and Nalgonda (11 Districts, 190+ Mandals)
+# ==============================================================================
 JURISDICTION_DATA = {
     "Khammam": {
-        "Khammam Urban": ["Khammam (M Corp)", "Khanapuram Haveli", "Dhamsalapuram", "Mallemadugu"],
-        "Khammam Rural": ["Arempula", "Edulapuram", "Gollapadu", "Theldarupalli", "Maddulapalli"],
-        "Kallur": ["Kallur", "Chinnakorukondi", "Peruvancha", "Lokavaram"],
-        "Madhira": ["Madhira", "Dendukuru", "Mallaram", "Siripuram"],
-        "Wyra": ["Wyra", "Somavaram", "Gannavaram", "Karamthota"],
-        "Sathupalli": ["Sathupalli", "Gangaram", "Kistaram", "Rejarla"],
-        "Nelakondapalli": ["Nelakondapalli", "Bodulabanda", "Kusumanchi"],
-        "Thirumalayapalem": ["Thirumalayapalem", "Sublaid", "Errappaigudem"],
-        "Enkoor": ["Enkoor", "Nacharam", "Timmapeta"],
-        "Penuballi": ["Penuballi", "Karakavagu", "Lingagudem"]
+        "Khammam Urban": ["Khammam (M Corp)", "Khanapuram Haveli", "Dhamsalapuram", "Mallemadugu", "Burhanpuram", "Velugumatla", "Polepalli"],
+        "Khammam Rural": ["Arempula", "Edulapuram", "Gollapadu", "Theldarupalli", "Maddulapalli", "M.Venkatayapalem", "Gudimalla", "Jalpalli", "Thirthala"],
+        "Raghunathapalem": ["Raghunathapalem", "Chimmapudi", "Eerlapudi", "Janakipuram", "Kamanchikal", "Koyachelaka", "Papatpally", "Venkatayapalem"],
+        "Kusumanchi": ["Kusumanchi", "Palair", "Jillellapadu", "Kokkireni", "Mallaigudem", "Naikangudem", "Nelapatla", "Perikasingaram", "Pocharam"],
+        "Thirumalayapalem": ["Thirumalayapalem", "Sublaid", "Errappaigudem", "Bachodu", "Bandampalli", "Jalpalli", "Kakarkal", "Patharlapadu"],
+        "Nelakondapalli": ["Nelakondapalli", "Bodulabanda", "Appalanarasimhapuram", "Banigandlapadu", "Byrannagudem", "Chennaram", "Mandrajpally", "Panigiri"],
+        "Mudigonda": ["Mudigonda", "Vallabhi", "Chirumarri", "Gokaraju Palli", "Kattukachavaram", "Madhapuram", "Mallaram", "Medepalli", "Pandillapalli"],
+        "Chinthakani": ["Chinthakani", "Jagannadhapuram", "Boppudi", "Chinna Mandava", "Komatlagudem", "Nagulavancha", "Patha Bitragunta", "Thimmaraopeta"],
+        "Wyra": ["Wyra", "Somavaram", "Gannavaram", "Karamthota", "Brahmanapalli", "Gollanapadu", "Govindapuram", "Musalimadugu", "Siripuram", "Vallapuram"],
+        "Bonakal": ["Bonakal", "Allinagaram", "Brahmanapalli", "Chirunomula", "Choppakatlapalem", "Govindapuram", "Kalakota", "Mustikuntla", "Ravinuthala"],
+        "Madhira": ["Madhira (M)", "Dendukuru", "Mallaram", "Siripuram", "Atkur", "Chavatapalli", "Didugupadu", "Rayapatnam", "Rompimalla", "Torraguntapalem"],
+        "Yerrupalem": ["Yerrupalem", "Banigandlapadu", "Bheemavaram", "Gosaveedu", "Inagali", "Jamigollepalli", "Kesireddypalli", "Peddagopathi", "Remidicherla"],
+        "Sathupalli": ["Sathupalli (M)", "Gangaram", "Kistaram", "Rejarla", "Bethupalli", "Cheruvumadhavaram", "Kakarlapalli", "Narayanapuram", "Rudrakshapalli"],
+        "Vemsoor": ["Vemsoor", "Adavimallela", "Berigopala Puram", "Chowdavaram", "Duddepudi", "Kandukur", "Marlapadu", "Paturu", "Venkatapuram"],
+        "Penuballi": ["Penuballi", "Karakavagu", "Lingagudem", "Bayyannagudem", "Bhimavaram", "Chinthalagudem", "Gangadevipadu", "Mandalapadu", "V.M.Banjara"],
+        "Kallur": ["Kallur", "Chinnakorukondi", "Peruvancha", "Lokavaram", "Chandrugonda", "Chennur", "Gokavaram", "Mucherla", "Payapur", "Pocharam"],
+        "Thallada": ["Thallada", "Billupadu", "Guntupalli", "Kalakota", "Kolanupalli", "Kothapeta", "Madhupalli", "Mittapalli", "Ramanagaram"],
+        "Enkoor": ["Enkoor", "Nacharam", "Timmapeta", "Bhurhanpur", "Jannaram", "Kolanupalli", "Medepalli", "Rajalingampeta"],
+        "Konijerla": ["Konijerla", "Basavapuram", "Ballepalli", "Chinna Gopapalli", "Gundrathimadugu", "Lalapuram", "Pallipadu", "Pedda Gopapalli", "Thanikella"],
+        "Singareni": ["Singareni", "Karepalli", "Gate Karepalli", "Madharam", "Manikyanagaram", "Motlagudem", "Perupalli", "Relakayalapalli", "Vishwanathapalli"],
+        "Kamepalli": ["Kamepalli", "Adavimallela", "Bada Thanda", "Cheruvumadhavaram", "Garla Vaddigudem", "Jagannadhapuram", "Manikyaram", "Ponnekal"]
     },
     "Bhadradri Kothagudem": {
-        "Kothagudem": ["Kothagudem (M)", "Chunchupalli", "Garimellapadu"],
-        "Palvancha": ["Palvancha (M)", "Ghanpur", "Ulvanuru"],
-        "Bhadrachalam": ["Bhadrachalam", "Seethampeta", "Nellipaka"],
-        "Manuguru": ["Manuguru", "Samithi Singaram", "Pagideru"],
-        "Yellandu": ["Yellandu (M)", "Rompaid", "Sudimalla"],
-        "Aswaraopeta": ["Aswaraopeta", "Vinayakapuram", "Gundlapadu"],
-        "Burgampahad": ["Burgampahad", "Sarapaka", "Morampalli Banjara"]
+        "Kothagudem": ["Kothagudem (M)", "Chunchupalli", "Garimellapadu", "Rudrampur", "Babu Camp", "Vidyanagar", "Penugadapa"],
+        "Palvancha": ["Palvancha (M)", "Ghanpur", "Ulvanuru", "Karakavagu", "Yanambailu", "Pandurangapuram", "Seetharampuram"],
+        "Chunchupalli": ["Chunchupalli", "Vidyanagar", "Penuballi", "Rudrampur", "Gouthampur", "Old Kothagudem"],
+        "Laxmidevipalli": ["Laxmidevipalli", "Chatakonda", "Regalla", "Gangaram", "Punukuduchela", "Hemachandrapuram"],
+        "Sujathanagar": ["Sujathanagar", "Nayanakonda", "Singabhupalem", "Mangapet", "Komararam", "Vegigudem"],
+        "Julurpad": ["Julurpad", "Kakarla", "Padamata Narsapuram", "Kommapalli", "Bheemanapalli", "Vinobanagar"],
+        "Chandrugonda": ["Chandrugonda", "Dammapeta", "Pokalagudem", "Thippanapalli", "Gannavaram", "Gurralacheruvu"],
+        "Tekulapalli": ["Tekulapalli", "Sulthan Nagar", "Bodu", "Koppurai", "Madharam", "Rollapadu", "Gundepudi"],
+        "Yellandu": ["Yellandu (M)", "Rompaid", "Sudimalla", "Komararam", "Mamillagudem", "Manikyaram", "Pocharam"],
+        "Allapalli": ["Allapalli", "Markode", "Dhaner", "Gundlapadu", "Kothuru", "Ramanakkapet"],
+        "Gundala": ["Gundala", "Allapalli", "Lingagudem", "Muthapuram", "Damaratogu", "Padigapuram", "Zinnelagudem"],
+        "Manuguru": ["Manuguru (M)", "Samithi Singaram", "Pagideru", "Kondapuram", "Toggudem", "Koonavaram", "Chinaranagudem"],
+        "Aswapuram": ["Aswapuram", "Nellipaka", "Chintiryala", "Gondigudem", "Kondapalli", "Manubothulagudem", "Mamidigudem"],
+        "Burgampahad": ["Burgampahad", "Sarapaka", "Morampalli Banjara", "Iravandi", "Nagineniprolu", "Sompalli", "Motugudem"],
+        "Pinapaka": ["Pinapaka", "Janampeta", "Bayyaram", "Madagudem", "Uppaka", "Pandillapalli", "Togagudem"],
+        "Karakagudem": ["Karakagudem", "Bhatpalli", "Kothaguda", "Raghavapuram", "Motlagudem", "Samatbhatpalli"],
+        "Cherla": ["Cherla", "Subbampeta", "Kurnapalli", "Lingapuram", "Moggallapalli", "Rallapuram", "Tepireddipalem"],
+        "Dummugudem": ["Dummugudem", "Parnasala", "Sunnambatti", "Kothapalli", "Gowraram", "Marikala", "Pedanallaballi"],
+        "Bhadrachalam": ["Bhadrachalam (GP)", "Seethampeta", "Nellipaka", "Kothuru", "Gundala", "Purushothapatnam"],
+        "Aswaraopeta": ["Aswaraopeta", "Vinayakapuram", "Gundlapadu", "Achutapuram", "Gummadavalli", "Kavundinya Puram"],
+        "Dammapeta": ["Dammapeta", "Apparaopeta", "Mandalapalli", "Nagupalli", "Gandugulapalli", "Katkur", "Patwarigudem"],
+        "Mulakalapalli": ["Mulakalapalli", "Madhavaram", "Kamalapuram", "Pogallapalli", "Annaram", "Thimmapuram"],
+        "Annapureddypalli": ["Annapureddypalli", "Gumpena", "Namazipeta", "Penugolu", "Peddagopathi", "Tallagudem"]
     },
     "Nalgonda": {
-        "Nalgonda": ["Nalgonda (M)", "Panagallu", "Arjalabavi", "Cherlapally"],
-        "Miryalaguda": ["Miryalaguda (M)", "Alagadapa", "Chinthapalli"],
-        "Devarakonda": ["Devarakonda", "Tatipole", "Kondabheemanapalli"],
-        "Nakrekal": ["Nakrekal", "Chityala", "Nomula"],
-        "Munugode": ["Munugode", "Kommaravelli", "Pulipalpula"]
+        "Nalgonda": ["Nalgonda (M)", "Panagallu", "Arjalabavi", "Cherlapally", "Appajipeta", "Chityala", "Dandepalli", "Gundlapalli", "Kanchanapalli"],
+        "Narketpally": ["Narketpally", "Cheruvugattu", "Bommireddigudem", "Chityala", "Mandra", "Nemmani", "Shali Gouraram", "Thummalaguda"],
+        "Chityal": ["Chityal (M)", "Gundrampally", "Vanipakala", "Velminedu", "Aregudem", "Chinna Kaparthy", "Pedda Kaparthy", "Pittampally"],
+        "Kattangur": ["Kattangur", "Aitipamula", "Bollepally", "Garikabanda", "Inupamula", "Kalmalla", "Kurumarthy", "Mallaram"],
+        "Nakrekal": ["Nakrekal (M)", "Chandampally", "Chityala", "Mangalpally", "Nomula", "Nellibanda", "Thipparthy", "Vallabhapur"],
+        "Thipparthy": ["Thipparthy", "Anantharam", "Indloor", "Jungamreddiguda", "Madharam", "Pajjur", "Sarvaram", "Surepally"],
+        "Kethepally": ["Kethepally", "Bhimaram", "Cheruvupally", "Gopala Puram", "Inparthi", "Kasarlapahad", "Korlapahad", "Uppalapahad"],
+        "Saligouraram": ["Saligouraram", "Aitipamula", "Chitloor", "Madhavaram", "Perkakondaram", "Thakkallapahad", "Utkur"],
+        "Munugode": ["Munugode", "Kommaravelli", "Pulipalpula", "Chikkepally", "Gudur", "Kalvakuntla", "Koratikal", "Singaram"],
+        "Chandur": ["Chandur (M)", "Gundlepally", "Kasthala", "Nelmari", "Pallepahad", "Sheripally", "Thummalapally"],
+        "Marriguda": ["Marriguda", "Dharmapuram", "Laxmidevipally", "Ramireddypally", "Sarampeta", "Sivannaguda", "Vattipally"],
+        "Nampally": ["Nampally", "Chalmeda", "Devatpally", "Guntapally", "Mahammadapuram", "Mustipally", "Pasnoor", "Thummalapally"],
+        "Gurrampode": ["Gurrampode", "Chamaledu", "Gandhammalla", "Junuthala", "Koppole", "Musalapally", "Nadigadda", "Pogilla"],
+        "Kanagal": ["Kanagal", "Bobbilypally", "Cheruvuantharam", "Dorepally", "Gundlapally", "Pagidimarri", "Shabajpally", "Thurpu Pally"],
+        "Devarakonda": ["Devarakonda (M)", "Tatipole", "Kondabheemanapalli", "Padamati Pally", "Seripally", "Chinthapally", "Mudigonda"],
+        "Kondamallepally": ["Kondamallepally", "Balepally", "Chinthalagudem", "Devaracharla", "Gundlapally", "Kolmunthalapahad"],
+        "Gundlapally (Dindi)": ["Dindi", "Gundlapally", "Gokaram", "Kamalapuram", "Kandukur", "Marriguda", "Thogapally"],
+        "Chandampet": ["Chandampet", "Gannerlapally", "Kambalapally", "Nerudugommu", "Pedamunigal", "Pogilla", "Yerraguntapally"],
+        "Neredugommu": ["Neredugommu", "Bugga Thanda", "Chinna Munigal", "Kacharajupally", "Vakati Thanda", "Yellareddyguda"],
+        "Pedda Adiserlapally (P.A. Pally)": ["P.A. Pally", "Angadipeta", "Ghanpur", "Gudipally", "Kondrapole", "Thirumalagiri", "Vaddipatla"],
+        "Peddavoora": ["Peddavoora", "Chinthapally", "Nandikonda (M)", "Pothunoor", "Pulicherla", "Sirasanagandla", "Tungathurthy"],
+        "Anumula (Haliya)": ["Haliya (M)", "Anumula", "Chinna Anumula", "Ibrahimpet", "Marepally", "Perur", "Rajavaram", "Salkanoor"],
+        "Thripuraram": ["Thripuraram", "Anjanapally", "Appalammagudem", "Dharmapuram", "Kampasagar", "Neelayagudem", "Satyanarayanapuram"],
+        "Nidamanoor": ["Nidamanoor", "Bommireddyguda", "Chillapally", "Guntipally", "Marriguda", "Thumadam", "Venkateshwarnagar"],
+        "Madugulapally": ["Madugulapally", "Chirumarthi", "Garikuntapally", "Kannekal", "Koppole", "Kukudlapally", "Thopicherla"],
+        "Miryalaguda": ["Miryalaguda (M)", "Alagadapa", "Chinthapalli", "Gudur", "Keshawapuram", "Rayannaguda", "Thallagadda", "Venkatadripeta"],
+        "Vemulapally": ["Vemulapally", "Amanagallu", "Buggalagudem", "Challagariga", "Madharam", "Molka Patnam", "Salakanoor"],
+        "Damaracherla": ["Damaracherla", "Adavidevulapally", "Balajinagar", "Kallepally", "Kondrapole", "Narsapur", "Thallaveerappagudem"],
+        "Adavidevulapally": ["Adavidevulapally", "Chityala", "Kothanandikonda", "Molakacharla", "Mukkamula", "Subbareddygudem"]
     },
     "Suryapet": {
-        "Suryapet": ["Suryapet (M)", "Kudakuda", "Pillalamarri", "Balaemla"],
-        "Kodad": ["Kodad (M)", "Thogarrai", "Gudibanda"],
-        "Huzurnagar": ["Huzurnagar (M)", "Burugugadda", "Macharam"],
-        "Thungathurthi": ["Thungathurthi", "Gotta", "Annaram"]
+        "Suryapet": ["Suryapet (M)", "Kudakuda", "Pillalamarri", "Balaemla", "Imampet", "Kesaram", "Pinnaipalem", "Tekumatla"],
+        "Chivvemla": ["Chivvemla", "Ailapuram", "Balanayak Thanda", "Gumpula", "Kudakuda", "Thimmapuram", "Undrugonda"],
+        "Mothey": ["Mothey", "Annariguda", "Burugugadda", "Mamillagudem", "Raghavapuram", "Sirikonda", "Vibhithapuram"],
+        "Jajireddygudem (Arvapally)": ["Arvapally", "Jajireddygudem", "Kandagatla", "Kommala", "Thimmapuram", "Vangamarthy"],
+        "Penpahad": ["Penpahad", "Anantharam", "Cheepunuthala", "Gajulmalkapuram", "Macharam", "Singareddypalem", "Thurpu Gudem"],
+        "Atmakur (S)": ["Atmakur", "Aregudem", "Enbamula", "Gattusingaram", "Kaparthisingaram", "Nemmikal", "Patha Suryapet"],
+        "Kodad": ["Kodad (M)", "Thogarrai", "Gudibanda", "Dora Kunta", "Komarabanda", "Nadigudem", "Tammarabanda"],
+        "Chilkur": ["Chilkur", "Bethavolu", "Jerripothulagudem", "Kondapuram", "Mulkanoor", "Ramapuram", "Seetharampuram"],
+        "Munagala": ["Munagala", "Barakathgudem", "Kalakova", "Kokkireni", "Madhavaram", "Nelamarri", "Repala", "Tadvai"],
+        "Nadigudem": ["Nadigudem", "Chakrirala", "Karivirala", "Ratnavaram", "Siripuram", "Telugurao Peta", "Venkataramapuram"],
+        "Ananthagiri": ["Ananthagiri", "Amancharla", "Channaram", "Gongulabanda", "Khanapuram", "Singavaram", "Tripuravaram"],
+        "Huzurnagar": ["Huzurnagar (M)", "Burugugadda", "Macharam", "Gopalapuram", "Karakkagudem", "Lingagiri", "Ponugodu"],
+        "Mattampally": ["Mattampally", "Alinagar", "Chintalapalem", "Gundlapally", "Mattampalli", "Pedaveedu", "Raghavapuram"],
+        "Mellachervu": ["Mellachervu", "Dondapadu", "Kandibanda", "Kothuru", "Ramaswamy Gudem", "Vepalamadhavaram"],
+        "Palakeedu": ["Palakeedu", "Alinagar", "Gundepuri", "Janpahad", "Mahankaligudem", "Sajjapuram", "Yellapuram"],
+        "Garidepally": ["Garidepally", "Appannapet", "Kalmalacheruvu", "Kutubshapuram", "Ponugodu", "Rayangudem", "Thimmareddygudem"],
+        "Nereducharla": ["Nereducharla (M)", "Bodaldinna", "Chilumuntala", "Fatehpur", "Penpahad", "Somavaram", "Yellammagudem"],
+        "Thungathurthi": ["Thungathurthi", "Annaram", "Gotta", "Karvirela", "Maddirala", "Pasnoor", "Sangem", "Venkepally"],
+        "Maddirala": ["Maddirala", "Chinna Madnoor", "Gorigepally", "Kuntlagudem", "Mamillagudem", "Mukundapuram", "Polumalla"],
+        "Nagaram": ["Nagaram", "Etoor", "Mamillapally", "Pasnoor", "Phanigiri", "Pothireddypally", "Vardhapuram"],
+        "Noothankal": ["Noothankal", "Bommireddygudem", "Chillapally", "Dirisinacharla", "Gundepuri", "Miryala", "Yellampeta"],
+        "Thirumalagiri": ["Thirumalagiri (M)", "Bandapally", "Chinthakunta", "Jalalpuram", "Mamillagudem", "Nelamarri", "Thimmapuram"]
     },
     "Yadadri Bhuvanagiri": {
-        "Bhongir": ["Bhongir (M)", "Rayagiri", "Bolligudem"],
-        "Alair": ["Alair", "Kolannur", "Shariefguda"],
-        "Choutuppal": ["Choutuppal", "Lingojiguda", "Thallasingaram"],
-        "Yadagirigutta": ["Yadagirigutta", "Gundlapally", "Saidapuram"]
+        "Bhongir": ["Bhongir (M)", "Rayagiri", "Bolligudem", "Anantharam", "Gouse Nagar", "Pagidipalli", "Thukkapur"],
+        "Bibinagar": ["Bibinagar", "Gudur", "Jameelapet", "Kondamadugu", "Mahadevpur", "Padamati Somaram", "Raghavapuram"],
+        "Bhoodan Pochampally": ["Pochampally (M)", "Bhimanapally", "Deshmukhi", "Jiblakpally", "Mukhtapur", "Revanapally"],
+        "Choutuppal": ["Choutuppal (M)", "Lingojiguda", "Thallasingaram", "Dharmojigudem", "Gokaram", "Koyyalagudem", "Panthangi"],
+        "Narayanpur": ["Narayanpur", "Chilkapally", "Gudur", "Jannaram", "Kotamarthy", "Pilligundla", "Sarvel", "Vankamamidi"],
+        "Ramannapet": ["Ramannapet", "Bogaram", "Janampally", "Kakkerla", "Kommayagudem", "Siripuram", "Thummalaguda"],
+        "Valigonda": ["Valigonda", "Arror", "Choutapally", "Golnepally", "Kanchanpally", "Proddutur", "Tekulasomaram", "Vemulakonda"],
+        "Yadagirigutta": ["Yadagirigutta (M)", "Gundlapally", "Saidapuram", "Datwarpally", "Gowraipally", "Mallesham Pally", "Vangapally"],
+        "Alair": ["Alair (M)", "Kolannur", "Shariefguda", "Bahilampur", "Gundlapally", "Manthapuri", "Tangutoor"],
+        "Rajapet": ["Rajapet", "Challur", "Dudvenna", "Kurraram", "Potharam", "Raghavapuram", "Singaram"],
+        "Turkapally": ["Turkapally", "Dharmaram", "Gandamalla", "Gopirajpally", "Madhavapur", "Rusthapur", "Venkatapur"],
+        "M.Turkapally": ["M.Turkapally", "Chinnaturkapally", "Dharmaram", "Munigadapa", "Peddaturkapally", "Velpu Gonda"],
+        "Motakondur": ["Motakondur", "Achanapally", "Chamalapally", "Gopalapuram", "Matedu", "Mutireddygudem"],
+        "Atmakur (M)": ["Atmakur", "Kapkarthi", "Koremula", "Modugula", "Pallerla", "Rachapally", "Sarvepally", "Thukkapur"],
+        "Gundala": ["Gundala", "Anantharam", "Brahmanapally", "Galanikota", "Sudhanpally", "Thurpu Pally", "Veldevi"],
+        "Addagudur": ["Addagudur", "Chinna Padishala", "Chirragudur", "Dharmaram", "Kanchinapally", "Repaka", "Veldevi"],
+        "Mothkur": ["Mothkur (M)", "Ammanabolu", "Dattappagudem", "Kondagadapapa", "Musipatla", "Panigiri", "Raghunathapuram"]
     },
     "Hanamkonda": {
-        "Hanamkonda": ["Hanamkonda (M Corp)", "Waddepally", "Lashkar Singaram"],
-        "Kazipet": ["Kazipet", "Madikonda", "Bheemaram", "Kadipikonda"],
-        "Kamalapur": ["Kamalapur", "Uppal", "Madannapet"],
-        "Parkal": ["Parkal (M)", "Kammaripalli", "Nagaram"]
+        "Hanamkonda": ["Hanamkonda (M Corp)", "Waddepally", "Lashkar Singaram", "Kumarpally", "Nayeemnagar", "Subedari", "Balasamudram"],
+        "Kazipet": ["Kazipet (M Corp)", "Madikonda", "Bheemaram", "Kadipikonda", "Somidi", "Tharalapally", "Rampur"],
+        "Bheemaram": ["Bheemaram", "Hasanparthy", "Pegadapalli", "Siddapur", "Mupparam", "Vangapahad"],
+        "Inavolu": ["Inavolu", "Kakkiralapally", "Kondaparthy", "Panthani", "Punnole", "Singaram", "Vanaparthy"],
+        "Hasanparthy": ["Hasanparthy", "Ananthasagar", "Bhimaram", "Devannapet", "Jayagiri", "Nagaram", "Sulthanpur"],
+        "Velair": ["Velair", "Ghanpur", "Mallikudurla", "Peechara", "Salarpur", "Veleda", "Yerrabelli"],
+        "Dharmasagar": ["Dharmasagar", "Chinthapally", "Devanoor", "Elkurthy", "Kyathampally", "Peddapendyala", "Unikicherla"],
+        "Elkathurthy": ["Elkathurthy", "Bhavanipet", "Dandepally", "Jeelugula", "Keshavapur", "Suraram", "Thimmapur"],
+        "Bheemadevarpalli": ["Bheemadevarpalli", "Kothakonda", "Manikhyapur", "Mustafapur", "Mulkanoor", "Rampur", "Vangara"],
+        "Kamalapur": ["Kamalapur", "Gundlapally", "Madannapet", "Marripellagudem", "Nerella", "Shanigaram", "Uppal"],
+        "Parkal": ["Parkal (M)", "Kammaripalli", "Nagaram", "Pocharam", "Rajupet", "Rayaparthy", "Vellampally"],
+        "Nadikuda": ["Nadikuda", "Choutapally", "Kowkonda", "Musthyalapally", "Narsakkapally", "Rayapally", "Varikole"],
+        "Damera": ["Damera", "Kogilwai", "Ladella", "Orugonda", "Pasargonda", "Puligilla", "Singarajupally"],
+        "Shayampet": ["Shayampet", "Gatla Kaniparthy", "Hussainpally", "Kothaguda", "Mylaram", "Neredpally", "Thimmapur"]
     },
     "Warangal": {
-        "Warangal": ["Warangal (M Corp)", "Ursu", "Mamnoor", "Gorrekunta"],
-        "Wardhannapet": ["Wardhannapet", "Bandautlapally", "Inavolu"],
-        "Narsampet": ["Narsampet", "Rajupet", "Maheswaram"],
-        "Geesugonda": ["Geesugonda", "Dharmaram", "Gorrekunta"]
+        "Warangal": ["Warangal (M Corp)", "Ursu", "Mamnoor", "Gorrekunta", "Deshaipet", "Kashibugga", "Enumamula", "Kareemabad"],
+        "Khila Warangal": ["Khila Warangal", "Bollikunta", "Mamnoor", "Nayeemnagar", "Thimmapur", "Vasalamarri", "Alankar"],
+        "Geesugonda": ["Geesugonda", "Dharmaram", "Gorrekunta", "Elkurthy", "Komatapally", "Mogilicherla", "Ookal", "Vanchana Giri"],
+        "Atmakur": ["Atmakur", "Agarpeta", "Brahmanapally", "Chowdlapally", "Housebujurg", "Neerukulla", "Penchikalpet"],
+        "Wardhannapet": ["Wardhannapet (M)", "Bandautlapally", "Dharmaram", "Inavolu", "Kothapally", "Nallabelli", "Upparapally"],
+        "Parvathagiri": ["Parvathagiri", "Choutapally", "Enugallu", "Gopapuram", "Kalleda", "Ravichettu Thanda", "Rollakal", "Somaram"],
+        "Rayaparthy": ["Rayaparthy", "Burahanpally", "Gannaram", "Jayaramthanda", "Keshavapuram", "Konduru", "Mylaram", "Perika Gudem"],
+        "Sangem": ["Sangem", "Ashwaranpally", "Chinthapally", "Gavarigudem", "Kapulakanaparthy", "Laxmipuram", "Mondrai", "Theegarajupally"],
+        "Narsampet": ["Narsampet (M)", "Rajupet", "Maheswaram", "Dasaripally", "Itikalpally", "Kammapally", "Madhannapet", "Muthojipet"],
+        "Chennaraopet": ["Chennaraopet", "Ameenabad", "Chennapur", "Jhalli", "Lingagiri", "Papaiahpally", "Thimmarainpahad", "Yellareddygudem"],
+        "Duggondi": ["Duggondi", "Adaviyangapally", "Chalaparthy", "Girnibavi", "Mandapalli", "Nachinapally", "Ponakallu", "Togarragudem"],
+        "Khanapur": ["Khanapur", "Ashoknagar", "Budharaopet", "Dharmaraopet", "Kothur", "Mangapet", "Raghavapuram"],
+        "Nekkonda": ["Nekkonda", "Appalraopeta", "Chandrugonda", "Gotlakonda", "Madipally", "Peddakorpole", "Reddial", "Venkatapur"]
     },
     "Jangaon": {
-        "Jangaon": ["Jangaon (M)", "Yeshwanthapur", "Chowdaram"],
-        "Station Ghanpur": ["Station Ghanpur", "Chagallu", "Shivunipally"],
-        "Palakurthi": ["Palakurthi", "Valmidi", "Dharmathanda"]
+        "Jangaon": ["Jangaon (M)", "Yeshwanthapur", "Chowdaram", "Champak Hills", "Peddapahad", "Siddankigudem", "Venkatigadda"],
+        "Lingalaghanpur": ["Lingalaghanpur", "Chetoor", "Ghanpur", "Jeedikallu", "Kallikur", "Kothapally", "Nelapogula", "Vangapally"],
+        "Bachannapet": ["Bachannapet", "Alimpur", "Bandanagaram", "Chinnaramcherla", "Itikalpally", "Keshireddypally", "Nagireddypally"],
+        "Devaruppula": ["Devaruppula", "Chinna Madnoor", "Kamareddygudem", "Kolukonda", "Manpahad", "Pedda Madnoor", "Singarajupally"],
+        "Narmetta": ["Narmetta", "Agapet", "Bommakur", "Gandiramaram", "Hanumanthapur", "Kankalapally", "Malkapur", "Veldanda"],
+        "Tharigoppula": ["Tharigoppula", "Akkaraju Pally", "Bonthupally", "Kamalapur", "Mirzapur", "Narsapur", "Solipur"],
+        "Raghunathpally": ["Raghunathpally", "Ashwaraopally", "Banjupally", "Fathashapur", "Kalasamudram", "Kanchanpally", "Madharam"],
+        "Station Ghanpur": ["Station Ghanpur", "Chagallu", "Shivunipally", "Ippaguda", "Meedidapally", "Raghunathpally", "Venkadath"],
+        "Chilpur": ["Chilpur", "Chinnapendyala", "Fatehpur", "Kondapur", "Lingampally", "Mallikadurla", "Nashkal"],
+        "Zaffergadh": ["Zaffergadh", "Alimpur", "Appireddypally", "Koonoor", "Raghunathpally", "Suraram", "Thimmapur", "Uppugal"],
+        "Palakurthi": ["Palakurthi", "Valmidi", "Dharmathanda", "Chennur", "Gudur", "Kandigatla", "Laxminarayanapuram", "Mutharam"],
+        "Kodakandla": ["Kodakandla", "Edunuthula", "Kamepally", "Lakshmakkapally", "Mondrai", "Narsimhulagudem", "Ramavaram"]
     },
     "Mahabubabad": {
-        "Mahabubabad": ["Mahabubabad (M)", "Bethole", "Kambalapally"],
-        "Dornakal": ["Dornakal", "Chilkodu", "Ravigudem"],
-        "Maripeda": ["Maripeda", "Neelikurthy", "Yellampeta"],
-        "Kesamudram": ["Kesamudram", "Inugurthy", "Korukondapally"]
+        "Mahabubabad": ["Mahabubabad (M)", "Bethole", "Kambalapally", "Anantharam", "Gumdudur", "Jamandlapally", "Musalimadugu", "Shikharam"],
+        "Kuravi": ["Kuravi", "Balharshiguda", "Chinna Thanda", "Gundrathimadugu", "Kandalgudem", "Modugulagudem", "Seetarampuram"],
+        "Dornakal": ["Dornakal (M)", "Chilkodu", "Ravigudem", "Andanalapadu", "Gollacherla", "Marriguda", "Perumandlagudem", "Vennaram"],
+        "Maripeda": ["Maripeda (M)", "Neelikurthy", "Yellampeta", "Abbaipalem", "Dharmaram", "Galivarigudem", "Rampur", "Thanamcherla"],
+        "Narsimhulapet": ["Narsimhulapet", "Agapet", "Danthalapalle", "Jayapuram", "Komatlagudem", "Peddanagaram", "Reponi"],
+        "Danthalapalle": ["Danthalapalle", "Bommakkapally", "Datla", "Gunturpally", "Kummarigudem", "Peddagopathi", "Vepalasingaram"],
+        "Garla": ["Garla", "Budidampadu", "Gopalapuram", "Kalluru", "Mulkanoor", "Muthyalamma Gudem", "Rampur", "Seripuram"],
+        "Bayyaram": ["Bayyaram", "Gandampally", "Garla", "Kambalapally", "Kothaguda", "Motlatothapally", "Pandipampula"],
+        "Kesamudram": ["Kesamudram", "Inugurthy", "Korukondapally", "Arpanapally", "Berigudem", "Dhanasiri", "Intikanne", "Upparapally"],
+        "Inugurthy": ["Inugurthy", "Chinna Mupparam", "Komatlagudem", "Maddulapally", "Pedda Mupparam", "Singaram"],
+        "Nellikudur": ["Nellikudur", "Ali Nagar", "Brahmana Kothapally", "Chinna Mupparam", "Erra Cheruvu", "Madharam", "Narsimhulapet"],
+        "Gudur": ["Gudur", "Ayodhyapur", "Bhupathipet", "Chinna Gudur", "Kongarigudem", "Matwada", "Narsapur", "Ponugodu"],
+        "Kothaguda": ["Kothaguda", "Bavurugonda", "Gangaram", "Gudur", "Komatlagudem", "Musalimadugu", "Pogallapally"],
+        "Gangaram": ["Gangaram", "Chintaguda", "Duginepally", "Komaram", "Kothaguda", "Madaguda", "Mamillagudem"],
+        "Chinna Gudur": ["Chinna Gudur", "Chinna Nagaram", "Jayaram Thanda", "Kothapally", "Uggampally", "Vidyasagar"],
+        "Seerole": ["Seerole", "Komatlagudem", "Madharam", "Malkapur", "Narsimhulapet", "Peddanagaram"]
     },
     "Jayashankar Bhupalpally": {
-        "Bhupalpally": ["Bhupalpally (M)", "Kompally", "Gorlaveedu"],
-        "Chityal": ["Chityal", "Giddamutharam", "Jadalpalli"],
-        "Regonda": ["Regonda", "Roopireddypally", "Kanakapoor"]
+        "Bhupalpally": ["Bhupalpally (M)", "Kompally", "Gorlaveedu", "Jangadupally", "Kamalapur", "Moranchapally", "Nawabpet", "Pambapur"],
+        "Chityal": ["Chityal", "Giddamutharam", "Jadalpalli", "Kailapur", "Mucherla", "Nainpaka", "Peddapur", "Thirumalapur"],
+        "Ghanpur (Mulug)": ["Ghanpur", "Appanapally", "Bhudharaopet", "Chelpur", "Gandhinagar", "Kondapur", "Mylaram"],
+        "Regonda": ["Regonda", "Roopireddypally", "Kanakapoor", "Chennapur", "Jagannadhpur", "Madathapally", "Repaka", "Sulthanpur"],
+        "Mogullapally": ["Mogullapally", "Ankushapur", "Gundlakarthi", "Issipet", "Motlapally", "Mulkalapally", "Peddapur", "Rangapur"],
+        "Tekumatla": ["Tekumatla", "Ankushapur", "Dubbagula", "Gaddalapally", "Kundanpally", "Raghavapur", "Venkatraopally"],
+        "Malhar Rao": ["Malhar Rao", "Edlapally", "Khammampally", "Kondampet", "Mallaram", "Manthani", "Tadicherla"],
+        "Kataram": ["Kataram", "Bayyaram", "Chintakani", "Danthanpally", "Gangaram", "Kothapally", "Medaram", "Sundarajupally"],
+        "Mahadevpur": ["Mahadevpur", "Annaram", "Bommepally", "Kaleshwaram", "Medigadda", "Palimela", "Suraram"],
+        "Palimela": ["Palimela", "Damarakunta", "Lenkalagadda", "Modumunja", "Pankena", "Sarvaipet"],
+        "Mutharam": ["Mutharam", "Adavisrirampur", "Dharmaram", "Khammampally", "Odedu", "Potaram", "Sarvaipet"]
     },
     "Mulugu": {
-        "Mulugu": ["Mulugu", "Bandaru", "Jaggannapet"],
-        "Venkatapur": ["Venkatapur", "Palampet (Ramappa)", "Laxmipuram"],
-        "Govindaraopet": ["Govindaraopet", "Pasra", "Chalvai"]
+        "Mulugu": ["Mulugu", "Bandaru", "Jaggannapet", "Incherla", "Kasimdevipeta", "Madhanapally", "Mallampally", "Pathipally"],
+        "Venkatapur": ["Venkatapur", "Palampet (Ramappa)", "Laxmipuram", "Appapur", "Chinna Kothapally", "Narsapur", "Ramanakkapet"],
+        "Govindaraopet": ["Govindaraopet", "Pasra", "Chalvai", "Garlavoddu", "Laknavaram", "Marlapally", "Rangapur"],
+        "Tadvai (Sammakka Sarakka)": ["Tadvai", "Medaram", "Katapur", "Kalvapally", "Narlapur", "Oorattam", "Project Nagar"],
+        "Eturnagaram": ["Eturnagaram", "Chinnaboinapally", "Dudekulapally", "Kondai", "Mullakatta", "Ramannagudem", "Roheer"],
+        "Mangapet": ["Mangapet", "Akinepally Mallaram", "Brahmanapally", "Cherupally", "Kathigudem", "Komshipally", "Narsimhasagar"],
+        "Kannaigudem": ["Kannaigudem", "Bussapur", "Chityala", "Gurrevula", "Muppanapally", "Rajannapet", "Thurpu Gudem"],
+        "Wazeed": ["Wazeed", "Arunachalapuram", "Chelluru", "Kongala", "Morammagudem", "Penugolu", "Tekulagudem"],
+        "Venkatapuram": ["Venkatapuram", "Alubaka", "Bojjiguppa", "Edira", "Marikala", "Morampally", "Patha Cheruvu"]
     }
 }
 
@@ -321,12 +460,15 @@ def get_worksheet():
     except Exception as e:
         return None, str(e)
 
-# Multi-Key Rotation Pool
+# Multi-Key Rotation Pool Retriever (Safe Secrets + Env + Session storage)
 def get_configured_api_keys():
     keys = []
+
+    # 1. User session override from sidebar
     if st.session_state.get("custom_gemini_key", "").strip():
         keys.append(st.session_state["custom_gemini_key"].strip())
 
+    # 2. Streamlit Cloud Secrets (Safely parsed)
     try:
         if "GEMINI_API_KEYS" in st.secrets:
             val = st.secrets["GEMINI_API_KEYS"]
@@ -342,19 +484,22 @@ def get_configured_api_keys():
     except Exception:
         pass
 
+    # 3. Environment Variables
     for env_k in ["GEMINI_API_KEY", "GOOGLE_API_KEY"]:
         if os.environ.get(env_k):
             keys.append(os.environ[env_k].strip())
 
+    # Deduplicate while preserving order
     seen = set()
     deduped = []
     for k in keys:
-        if len(k) > 15 and k not in seen:
-            seen.add(k)
-            deduped.append(k)
+        clean_k = k.strip().replace('"', '').replace("'", "")
+        if len(clean_k) > 15 and clean_k not in seen:
+            seen.add(clean_k)
+            deduped.append(clean_k)
     return deduped
 
-# Image Enhancement Engine
+# Automated Image Enhancement Pipeline
 def enhance_image_for_ocr(image_bytes):
     try:
         img = Image.open(io.BytesIO(image_bytes))
@@ -450,21 +595,21 @@ def parse_acknowledgement_pdf(file_bytes):
     except Exception:
         return {}, ""
 
-# Clean JSON parser
+# Clean and Parse JSON with Fallback
 def clean_and_parse_json(text_content):
     txt = text_content.strip()
-    if txt.startswith("```"):
-        first_newline = txt.find("\n")
-        if first_newline != -1:
-            txt = txt[first_newline + 1:]
-    if txt.endswith("```"):
-        txt = txt[:-3].strip()
     match = re.search(r'(\{[\s\S]*\})', txt)
     if match:
-        return json.loads(match.group(1))
-    return json.loads(txt)
+        try:
+            return json.loads(match.group(1))
+        except Exception:
+            pass
+    try:
+        return json.loads(txt)
+    except Exception:
+        return extract_fields_from_raw_text(text_content)
 
-# Engine 2: Google Lens AI Vision
+# Engine 2: Google Lens AI Vision with Dual Header & Param Routing
 def parse_with_google_lens(file_bytes, mime_type, api_keys):
     if not api_keys:
         return {}, "", "No API Keys Configured"
@@ -479,7 +624,7 @@ Locate and extract:
 5. House Number
 6. Mlc Name / Constituency
 7. District Name
-8. Status is strictly 'Submitted'.
+8. Status is strictly 'Submitted'. Do NOT put the Application ID here.
 
 Return ONLY a valid JSON object matching:
 {
@@ -508,15 +653,16 @@ Return ONLY a valid JSON object matching:
     last_err = ""
 
     for key in api_keys:
-        # Validate key format
-        if not key.startswith("AIzaSy"):
-            last_err = f"Key '{key[:8]}...' does not start with 'AIzaSy'. Please use an API Key from Google AI Studio."
-            continue
+        clean_key = key.strip()
+        headers = {
+            "x-goog-api-key": clean_key,
+            "Content-Type": "application/json"
+        }
 
         for model in models:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
             try:
-                res = requests.post(url, json=payload, timeout=28)
+                res = requests.post(url, headers=headers, json=payload, timeout=28)
                 if res.status_code == 200:
                     body = res.json()
                     text_content = body["candidates"][0]["content"]["parts"][0]["text"]
@@ -527,10 +673,20 @@ Return ONLY a valid JSON object matching:
                         data["current_status"] = "Submitted"
 
                     ocr_raw = data.pop("ocr_full_text", "")
+                    if not ocr_raw and "applicant_name" in data:
+                        ocr_raw = f"{data.get('applicant_name')} | {data.get('application_id')}"
                     return data, ocr_raw, "OK"
                 else:
-                    last_err = f"Google API Error {res.status_code}: {res.text[:120]}"
+                    last_err = f"Status {res.status_code}: {res.text[:120]}"
                     if res.status_code in [400, 401, 403]:
+                        query_url = f"{url}?key={clean_key}"
+                        res2 = requests.post(query_url, json=payload, timeout=28)
+                        if res2.status_code == 200:
+                            body2 = res2.json()
+                            text_content2 = body2["candidates"][0]["content"]["parts"][0]["text"]
+                            data2 = clean_and_parse_json(text_content2)
+                            ocr_raw2 = data2.pop("ocr_full_text", "")
+                            return data2, ocr_raw2, "OK"
                         break
             except Exception as e:
                 last_err = str(e)
@@ -553,7 +709,7 @@ def parse_with_offline_ocr(file_bytes):
     except Exception as ex:
         return {}, "", str(ex)
 
-# Universal Router
+# Universal Multi-Device Router
 def extract_universal_document(uploaded_file, file_bytes, api_keys):
     filename = uploaded_file.name.lower() if hasattr(uploaded_file, 'name') else "image.jpg"
 
@@ -566,12 +722,16 @@ def extract_universal_document(uploaded_file, file_bytes, api_keys):
     # 2. Enhance image
     enhanced_bytes, mime_type = enhance_image_for_ocr(file_bytes)
 
-    # 3. Try Google Lens AI Vision
+    # 3. Google Lens AI Vision
     lens_data, raw_txt, err_detail = parse_with_google_lens(enhanced_bytes, mime_type, api_keys)
     if lens_data.get("application_id") or lens_data.get("applicant_name"):
         return lens_data, raw_txt, "Google Lens AI (Enhanced)", ""
 
-    # 4. Offline Tesseract OCR Fallback (Works with no API key)
+    lens_data2, raw_txt2, _ = parse_with_google_lens(file_bytes, "image/jpeg", api_keys)
+    if lens_data2.get("application_id") or lens_data2.get("applicant_name"):
+        return lens_data2, raw_txt2, "Google Lens AI Module", ""
+
+    # 4. Offline Tesseract OCR Fallback
     tess_data, tess_txt, tess_err = parse_with_offline_ocr(enhanced_bytes)
     if tess_data.get("application_id") or tess_data.get("applicant_name"):
         return tess_data, tess_txt, "Offline Tesseract OCR", ""
@@ -694,15 +854,15 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     st.markdown(f"**Operator:** {st.session_state.full_name}")
     st.markdown(f"**Role:** `{st.session_state.role}`")
-    st.caption(f"🔑 Active Keys Configured: **{len(configured_keys)}**")
+    st.caption(f"🔑 Active OCR Engines Loaded: **{len(configured_keys)} Keys**")
     if st.button("Log Out", use_container_width=True):
         st.session_state.logged_in = False
         st.rerun()
     st.divider()
 
     with st.expander("⚙️ Gemini API Key (For Google Lens)"):
-        st.caption("Keys must start with `AIzaSy...` from Google AI Studio.")
-        custom_k = st.text_input("Add Google AI Studio Key", type="password", value=st.session_state.get("custom_gemini_key", ""))
+        st.caption("Active keys loaded securely from Streamlit Secrets.")
+        custom_k = st.text_input("Add Additional Key", type="password", value=st.session_state.get("custom_gemini_key", ""))
         if custom_k:
             st.session_state["custom_gemini_key"] = custom_k
             configured_keys = get_configured_api_keys()
@@ -772,7 +932,7 @@ with main_tab1:
             current_hash = hashlib.md5(target_bytes).hexdigest()
 
             if st.session_state["last_file_hash"] != current_hash:
-                with st.spinner("🔍 Scanning & extracting voter slip..."):
+                with st.spinner("🔍 Scanning & extracting voter slip with Google Lens..."):
                     extracted_info, raw_ocr, engine_used, err_detail = extract_universal_document(target_file_obj, target_bytes, configured_keys)
 
                     if extracted_info.get("application_id") or extracted_info.get("applicant_name"):
@@ -790,8 +950,6 @@ with main_tab1:
                         st.rerun()
                     else:
                         st.error(f"Could not parse image. {err_detail}")
-                        if "AIzaSy" in err_detail:
-                            st.info("💡 To get a real Gemini API Key, visit https://aistudio.google.com/apikey (it takes 10 seconds and starts with `AIzaSy`).")
 
         if st.session_state["field_app_id"]:
             engine_label = st.session_state.get("last_engine", "Extracted")
@@ -832,19 +990,23 @@ with main_tab1:
                     break
 
             selected_district = st.selectbox("Select District", all_districts, index=default_dist_idx)
-            available_mandals = list(JURISDICTION_DATA[selected_district].keys())
+            available_mandals = sorted(list(JURISDICTION_DATA[selected_district].keys()))
             selected_mandal = st.selectbox("Select Mandal", available_mandals)
             
-            available_villages = JURISDICTION_DATA[selected_district][selected_mandal] + ["Other / Unlisted"]
+            available_villages = sorted(JURISDICTION_DATA[selected_district][selected_mandal]) + ["Other / Enter Manually"]
             selected_village = st.selectbox("Select Revenue Village / Ward", available_villages)
-            final_village = st.text_input("Enter Revenue Village Name") if selected_village == "Other / Unlisted" else selected_village
+            
+            if selected_village == "Other / Enter Manually":
+                final_village = st.text_input("Enter Revenue Village / Ward / Colony Name", placeholder="Type village or ward name")
+            else:
+                final_village = selected_village
 
             st.markdown("---")
             st.markdown("##### 🤝 Party Volunteer & Reference Details")
             r1, r2 = st.columns(2)
-            ref_name = r1.text_input("Party Reference / Cadre Name", value="", placeholder="Enter Reference / Mandal Incharge Name")
-            mobile_no = r2.text_input("Voter Mobile Number", placeholder="10-digit number")
-            remarks = st.text_area("Remarks / Notes", placeholder="e.g., Degree Certificate verified, BRS supporter")
+            ref_name = r1.text_input("Party Reference / Cadre Name", value="", placeholder="Mandal Incharge / Cadre Name")
+            mobile_no = r2.text_input("Voter Mobile Number", placeholder="10-digit mobile number")
+            remarks = st.text_area("Remarks / Notes", placeholder="e.g., Form-18 acknowledged, Degree certificate verified, Mobile confirmed")
 
             save_btn = st.form_submit_button("🚗 Save & Submit to BRS Voter Database", use_container_width=True)
 
