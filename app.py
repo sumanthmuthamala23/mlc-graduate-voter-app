@@ -15,7 +15,7 @@ import requests
 import urllib.parse
 from datetime import datetime
 
-# Local OCR fallback
+# Fallback local OCR engine
 try:
     import pytesseract
     HAS_PYTESSERACT = True
@@ -29,6 +29,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Locate poster image if available
 def get_banner_image():
     for filename in ["brs_banner_bg.png", "1461945.png", "brs_banner_bg.jpg", "brs_logo.webp", "brs_logo.jpg"]:
         if os.path.exists(filename):
@@ -37,7 +38,7 @@ def get_banner_image():
 
 banner_img_path = get_banner_image()
 
-# BRS Party Theme Styling
+# BRS Styling + Discrete Credit Footer
 st.markdown("""
 <style>
     .stApp {
@@ -48,7 +49,7 @@ st.markdown("""
     .main .block-container {
         max-width: 1220px;
         padding-top: 1rem;
-        padding-bottom: 2.5rem;
+        padding-bottom: 3.5rem;
     }
 
     .lens-header-card {
@@ -185,6 +186,22 @@ st.markdown("""
         color: #C2185B !important;
         font-weight: 800 !important;
     }
+
+    /* Clean, Non-intrusive Developer Footer */
+    .developer-footer {
+        text-align: center;
+        margin-top: 36px;
+        padding-top: 14px;
+        border-top: 1px dashed #F8BBD0;
+        font-size: 13px;
+        color: #880E4F;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+    }
+    .developer-footer span {
+        color: #E61A8D;
+        font-weight: 800;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -201,6 +218,13 @@ HEADERS = [
 def render_top_poster():
     if banner_img_path:
         st.image(banner_img_path, use_container_width=True)
+
+def render_footer():
+    st.markdown("""
+    <div class="developer-footer">
+        Developed by <span>Sumanth Muthamala</span> | BRS Central War Room Console
+    </div>
+    """, unsafe_allow_html=True)
 
 # Database Setup
 def init_db():
@@ -487,7 +511,7 @@ def get_cached_worksheet():
 def get_worksheet():
     return get_cached_worksheet()
 
-# Multi-Key Rotation Pool Retriever (Safe Secrets + Env + Session storage)
+# Multi-Key Rotation Pool Retriever
 def get_configured_api_keys():
     keys = []
 
@@ -868,6 +892,8 @@ if not st.session_state.logged_in:
         </div>
         """, unsafe_allow_html=True)
 
+        render_footer()
+
     st.stop()
 
 # Workspace
@@ -1132,11 +1158,12 @@ with main_tab1:
 
                             st.success(f"🎉 Successfully Ingested: {name} ({app_id}) to BRS Central Records!")
                             
-                            # Safe deferred reset trigger
                             st.session_state["clear_form_trigger"] = True
                             st.rerun()
                         except Exception as ex:
                             st.error(f"Error appending row: {ex}")
+
+    render_footer()
 
 # TAB 2: WAR ROOM ANALYTICS
 if st.session_state.role == "Admin":
@@ -1247,3 +1274,5 @@ if st.session_state.role == "Admin":
 
             except Exception as e:
                 st.error(f"Error computing dashboard analytics: {e}")
+
+        render_footer()
