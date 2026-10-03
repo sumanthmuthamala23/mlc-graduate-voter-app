@@ -12,6 +12,7 @@ import io
 import json
 import base64
 import requests
+import urllib.parse
 from datetime import datetime
 
 # Fallback local OCR engine
@@ -46,7 +47,7 @@ st.markdown("""
     }
 
     .main .block-container {
-        max-width: 1200px;
+        max-width: 1220px;
         padding-top: 1rem;
         padding-bottom: 2.5rem;
     }
@@ -91,6 +92,14 @@ st.markdown("""
         padding: 24px 22px !important;
         box-shadow: 0 10px 28px rgba(230, 26, 141, 0.10) !important;
         margin-bottom: 20px;
+    }
+
+    .wa-card {
+        background: #E8F5E9;
+        border: 2px solid #81C784;
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin: 16px 0;
     }
 
     label[data-testid="stWidgetLabel"] p {
@@ -505,7 +514,6 @@ def enhance_image_for_ocr(image_bytes):
         img = Image.open(io.BytesIO(image_bytes))
         img = ImageOps.exif_transpose(img)
         w, h = img.size
-        # Optimize dimensions for 1-second OCR
         if w > 1600 or h > 1600:
             img.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
         elif w < 900 or h < 900:
@@ -642,7 +650,6 @@ Extract these exact fields as JSON:
         "generationConfig": {"response_mime_type": "application/json"}
     }
 
-    # Fast models priority (1-2s response time)
     models = ["gemini-1.5-flash", "gemini-2.0-flash"]
     last_err = ""
 
@@ -691,25 +698,21 @@ def parse_with_offline_ocr(file_bytes):
     except Exception as ex:
         return {}, "", str(ex)
 
-# Universal Multi-Device Router (High-Speed Priority)
+# Universal Multi-Device Router
 def extract_universal_document(uploaded_file, file_bytes, api_keys):
     filename = uploaded_file.name.lower() if hasattr(uploaded_file, 'name') else "image.jpg"
 
-    # 1. Digital PDF (Ultra-fast, instant < 0.05s)
     if filename.endswith(".pdf"):
         data, raw_txt = parse_acknowledgement_pdf(file_bytes)
         if data.get("application_id") or data.get("applicant_name"):
             return data, raw_txt, "PDF Text Engine", ""
 
-    # 2. Optimize image (0.1s)
     enhanced_bytes, mime_type = enhance_image_for_ocr(file_bytes)
 
-    # 3. Google Lens Vision (~1s)
     lens_data, raw_txt, err_detail = parse_with_google_lens(enhanced_bytes, mime_type, api_keys)
     if lens_data.get("application_id") or lens_data.get("applicant_name"):
         return lens_data, raw_txt, "Google Lens AI", ""
 
-    # 4. Offline Tesseract Fallback (< 0.8s)
     tess_data, tess_txt, tess_err = parse_with_offline_ocr(enhanced_bytes)
     if tess_data.get("application_id") or tess_data.get("applicant_name"):
         return tess_data, tess_txt, "Offline OCR Engine", ""
@@ -762,14 +765,13 @@ def log_duplicate(app_id, name, operator):
     conn.commit()
     conn.close()
 
-# Session State Initialization (Mapped directly to Input Widgets)
+# Session State Initialization
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = None
     st.session_state.role = None
     st.session_state.full_name = None
 
-# Direct Input Key Bindings
 widget_keys = {
     "inp_app_id": "",
     "inp_name": "",
@@ -787,7 +789,8 @@ widget_keys = {
     "custom_village_input": "",
     "last_file_hash": "",
     "lens_detected_raw": "",
-    "last_engine": ""
+    "last_engine": "",
+    "last_saved_voter": None
 }
 
 for k, default_val in widget_keys.items():
@@ -942,11 +945,10 @@ with main_tab1:
             current_hash = hashlib.md5(target_bytes).hexdigest()
 
             if st.session_state["last_file_hash"] != current_hash:
-                with st.spinner("⚡ Extracting data to dialogue boxes..."):
+                with st.spinner("⚡ Extracting data directly to dialogue boxes..."):
                     extracted_info, raw_ocr, engine_used, err_detail = extract_universal_document(target_file_obj, target_bytes, configured_keys)
 
                     if extracted_info.get("application_id") or extracted_info.get("applicant_name"):
-                        # Direct assignment to the exact widget keys forces immediate autofill
                         st.session_state["inp_app_id"] = str(extracted_info.get("application_id", ""))
                         st.session_state["inp_name"] = str(extracted_info.get("applicant_name", ""))
                         st.session_state["inp_gender"] = str(extracted_info.get("gender", ""))
@@ -955,7 +957,6 @@ with main_tab1:
                         st.session_state["inp_mlc"] = str(extracted_info.get("mlc_constituency", "")) or "Warangal-Khammam-Nalgonda"
                         st.session_state["inp_status"] = str(extracted_info.get("current_status", "Submitted"))
                         
-                        # Match district automatically if present
                         detected_dist = str(extracted_info.get("district_name", "")).strip().lower()
                         for d_name in list(JURISDICTION_DATA.keys()):
                             if d_name.lower() in detected_dist or detected_dist in d_name.lower():
@@ -1003,8 +1004,6 @@ with main_tab1:
         st.markdown("##### 📍 Tag Jurisdiction (Instant Sync)")
         
         all_districts = list(JURISDICTION_DATA.keys())
-        
-        # Keep district valid
         if st.session_state["sel_district"] not in all_districts:
             st.session_state["sel_district"] = all_districts[0]
 
@@ -1014,7 +1013,6 @@ with main_tab1:
             key="sel_district"
         )
         
-        # Reactively load mandals
         available_mandals = sorted(list(JURISDICTION_DATA[selected_district].keys()))
         if st.session_state.get("sel_mandal") not in available_mandals:
             st.session_state["sel_mandal"] = available_mandals[0]
@@ -1025,7 +1023,6 @@ with main_tab1:
             key="sel_mandal"
         )
         
-        # Reactively load villages for that mandal
         village_options = sorted(JURISDICTION_DATA[selected_district][selected_mandal]) + ["Other / Enter Manually"]
         if st.session_state.get("sel_village") not in village_options:
             st.session_state["sel_village"] = village_options[0]
@@ -1046,19 +1043,56 @@ with main_tab1:
         r1, r2 = st.columns(2)
         ref_name = r1.text_input("Party Reference / Cadre Name", placeholder="Mandal Incharge / Cadre Name", key="inp_ref_name")
         mobile_no = r2.text_input("Voter Mobile Number", placeholder="10-digit mobile number", key="inp_mobile_no")
-        remarks = st.text_area("Remarks / Notes", placeholder="e.g., Form-18 acknowledged, Degree certificate verified", key="inp_remarks")
+        
+        # Phone Number Real-Time Validation
+        clean_mobile = re.sub(r'[^0-9]', '', mobile_no.strip())
+        is_mobile_valid = True
+        if clean_mobile:
+            if not re.match(r'^[6-9]\d{9}$', clean_mobile):
+                is_mobile_valid = False
+                st.caption("⚠️ Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.")
+
+        remarks = st.text_area("Remarks / Notes", placeholder="e.g., Form-18 acknowledged, Degree certificate verified, Supporter", key="inp_remarks")
 
         save_btn = st.button("🚗 Save & Submit to BRS Voter Database", use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
+        # 📲 1-Click WhatsApp Voter Confirmation Card
+        if st.session_state.get("last_saved_voter"):
+            voter = st.session_state["last_saved_voter"]
+            v_name = voter.get("name", "")
+            v_id = voter.get("app_id", "")
+            v_phone = voter.get("mobile", "")
+            v_const = voter.get("constituency", "Warangal-Khammam-Nalgonda")
+
+            st.markdown('<div class="wa-card">', unsafe_allow_html=True)
+            st.markdown(f"**🎉 Successfully Registered:** `{v_name}` ({v_id})")
+            
+            if v_phone and re.match(r'^[6-9]\d{9}$', v_phone):
+                msg_body = (
+                    f"🌸 *భారత రాష్ట్ర సమితి (BRS) — War Room*\n\n"
+                    f"నమస్కారం {v_name} గారు,\n"
+                    f"మీ MLC గ్రాడ్యుయేట్ ఓటర్ నమోదు (Form-18) దరఖాస్తు విజయవంతంగా BRS War Room రికార్డులలో నమోదయింది.\n\n"
+                    f"📌 *Application ID:* {v_id}\n"
+                    f"📍 *Constituency:* {v_const}\n\n"
+                    f"నల్గొండ - వరంగల్ - ఖమ్మం గ్రాడ్యుయేట్ ఎమ్మెల్సీ ఎన్నికల్లో మన ఓటు — *కారు గుర్తుకే* 🚗"
+                )
+                encoded_msg = urllib.parse.quote(msg_body)
+                wa_url = f"https://wa.me/91{v_phone}?text={encoded_msg}"
+                st.link_button(f"📲 Send Instant WhatsApp Confirmation to {v_phone}", wa_url, use_container_width=True)
+            else:
+                st.caption("ℹ️ Voter mobile number not provided. Record saved to Central Database.")
+            st.markdown('</div>', unsafe_allow_html=True)
+
         if save_btn:
             if not app_id or not name:
                 st.error("Application ID and Applicant Name are mandatory.")
+            elif clean_mobile and not is_mobile_valid:
+                st.error("Please provide a valid 10-digit mobile number or leave it blank.")
             else:
-                # Instant local duplicate check (0.001s)
                 if check_duplicate_local(app_id):
                     log_duplicate(app_id, name, st.session_state.username)
-                    st.warning(f"⚠️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
+                    st.warning(f"⚠️️ Duplicate Detected! Application ID {app_id} already exists in database. Logged in audit trail.")
                 else:
                     ws, err = get_worksheet()
                     if ws is None:
@@ -1070,10 +1104,19 @@ with main_tab1:
                                 app_id, name, gender, relation, house_no,
                                 mlc_const, selected_district, status,
                                 selected_district, selected_mandal, final_village,
-                                ref_name, mobile_no, remarks, st.session_state.username
+                                ref_name, clean_mobile, remarks, st.session_state.username
                             ]
                             ws.append_row(new_entry)
                             record_local_entry(app_id, name)
+                            
+                            # Cache for 1-click WhatsApp messaging
+                            st.session_state["last_saved_voter"] = {
+                                "name": name,
+                                "app_id": app_id,
+                                "mobile": clean_mobile,
+                                "constituency": mlc_const
+                            }
+
                             st.success(f"🎉 Successfully Ingested: {name} ({app_id}) to BRS Central Records!")
                             
                             # Clean reset for next voter slip
@@ -1112,16 +1155,54 @@ if st.session_state.role == "Admin":
                     dup_df = pd.read_sql_query("SELECT * FROM duplicate_audit ORDER BY id DESC", conn)
                     conn.close()
 
-                    m1, m2, m3, m4 = st.columns(4)
+                    today_str = datetime.now().strftime("%Y-%m-%d")
+                    today_votes = df[df["Timestamp"].str.startswith(today_str)].shape[0] if "Timestamp" in df.columns else 0
+
+                    m1, m2, m3, m4, m5 = st.columns(5)
                     total_votes = len(df)
                     unique_voters = df["Application ID"].nunique() if "Application ID" in df.columns else total_votes
                     duplicate_attempts = len(dup_df)
                     active_operators = df["Operator Username"].nunique() if "Operator Username" in df.columns else 1
 
                     m1.metric("Total Ingested Votes", f"{total_votes:,}")
-                    m2.metric("Unique Verified Voters", f"{unique_voters:,}")
-                    m3.metric("Duplicates Filtered", f"{duplicate_attempts:,}")
-                    m4.metric("Active War Room Cadre", f"{active_operators}")
+                    m2.metric("Today's Mobilization", f"{today_votes:,}")
+                    m3.metric("Unique Verified Voters", f"{unique_voters:,}")
+                    m4.metric("Duplicates Filtered", f"{duplicate_attempts:,}")
+                    m5.metric("Active War Room Cadre", f"{active_operators}")
+
+                    # 📥 Instant One-Click CSV Export Button
+                    st.write("")
+                    csv_bytes = df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Download Complete Voter Database (.CSV)",
+                        data=csv_bytes,
+                        file_name=f"BRS_MLC_Voters_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+
+                    st.divider()
+
+                    # 🏆 Cadre & Volunteer Performance Leaderboard
+                    lead_col1, lead_col2 = st.columns(2)
+                    
+                    with lead_col1:
+                        st.subheader("🏆 Top Operator Leaderboard")
+                        if "Operator Username" in df.columns:
+                            operator_counts = df["Operator Username"].value_counts().reset_index()
+                            operator_counts.columns = ["Operator", "Voters Ingested"]
+                            st.dataframe(operator_counts, use_container_width=True, hide_index=True)
+
+                    with lead_col2:
+                        st.subheader("🤝 Top Party Reference / Cadre")
+                        if "Reference Name" in df.columns:
+                            valid_refs = df[df["Reference Name"].str.strip() != ""]
+                            if not valid_refs.empty:
+                                ref_counts = valid_refs["Reference Name"].value_counts().head(10).reset_index()
+                                ref_counts.columns = ["Reference / Cadre", "Total Mobilized"]
+                                st.dataframe(ref_counts, use_container_width=True, hide_index=True)
+                            else:
+                                st.caption("No party references tagged yet.")
 
                     st.divider()
 
